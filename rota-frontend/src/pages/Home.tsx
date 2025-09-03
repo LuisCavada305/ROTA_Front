@@ -31,6 +31,55 @@ export default function Home() {
           </div>
         </div>
       </main>
+
+      {/* ===== Sobre Nós ===== */}
+      <section className="about-section" aria-labelledby="about-title">
+        <div className="about-container">
+          <h2 id="about-title" className="about-title">Sobre Nós</h2>
+
+          <div className="about-grid">
+            <article className="about-card">
+              <img
+                src="https://projetorota.com.br/wp-content/uploads/2024/04/logo-enactus-esquerda-redonda.png"
+                alt="Liga Enactus Mackenzie"
+                className="about-icon"
+              />
+              <h3 className="about-card-title">Equipe</h3>
+              <p className="about-card-desc">
+                Alunos da Universidade Presbiteriana Mackenzie, integrantes da Liga Enactus
+                Mackenzie, com interesse em criar um mundo melhor e mais sustentável.
+              </p>
+            </article>
+
+            <article className="about-card">
+              <img
+                src="https://projetorota.com.br/wp-content/uploads/2024/04/Mask-group.png"
+                alt="Objetivo do Projeto Rota"
+                className="about-icon"
+              />
+              <h3 className="about-card-title">Objetivo</h3>
+              <p className="about-card-desc">
+                Capacitar jovens em situação de vulnerabilidade e auxiliá-los a conquistar
+                oportunidades em empresas qualificadas, promovendo inclusão produtiva e
+                desenvolvimento profissional.
+              </p>
+            </article>
+
+            <article className="about-card">
+              <img
+                src="https://projetorota.com.br/wp-content/uploads/2024/04/003-computer.png"
+                alt="Conteúdo das trilhas"
+                className="about-icon"
+              />
+              <h3 className="about-card-title">Conteúdo</h3>
+              <p className="about-card-desc">
+                5 trilhas de aprendizagem com vídeoaulas, e-books, questionários e, ao final,
+                emissão do certificado Rota.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
     </Layout>
   );
 }

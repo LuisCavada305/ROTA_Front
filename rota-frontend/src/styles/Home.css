@@ -110,3 +110,80 @@ body, .layout {
   .hero-tagline{ font-size: 1.05rem; }
   .hero-illustration{ max-width: 300px; }
 }
+
+/* ===== Sobre Nós ===== */
+.about-section {
+  background: #fff;
+  padding: 64px 16px 80px;
+}
+
+.about-container {
+  max-width: 1080px;
+  margin: 0 auto;
+}
+
+.about-title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #0a66c2;
+  text-align: center;
+  margin: 0 0 40px 0;
+}
+
+.about-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.about-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px 20px;
+  text-align: center;
+  border: 1px solid rgba(10,102,194,0.15);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+
+.about-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+}
+
+.about-icon {
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+  margin: 0 auto 16px auto;
+}
+
+.about-card-title {
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: #113a6b;
+  margin: 8px 0 10px 0;
+}
+
+.about-card-desc {
+  font-size: 1rem;
+  line-height: 1.55;
+  color: #444;
+  margin: 0;
+}
+
+/* Responsivo */
+@media (max-width: 980px) {
+  .about-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .about-grid {
+    grid-template-columns: 1fr;
+  }
+  .about-title {
+    font-size: 1.6rem;
+  }
+}

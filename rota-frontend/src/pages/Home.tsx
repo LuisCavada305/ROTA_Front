@@ -14,8 +14,14 @@ import EnactusGeralLogo from "../images/enactus.png";
 import DiretoriaEnsinoLogo from "../images/diretoriaEnsino.png";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, Pagination, Autoplay } from "swiper/modules";
+import { http } from "../lib/http";
 
 export default function Home() {
+  async function getTrilhasShowcase() {
+    const response = await http.get("/trilhas/showcase");
+    return response.data;
+  }
+
   return (
     <Layout>
       <main className="home-hero">

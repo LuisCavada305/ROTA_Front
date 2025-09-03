@@ -2,6 +2,11 @@ import Layout from "../components/Layout";
 import "../styles/Home.css";
 import LogoRotaSemFundo from "../images/RotaSemFundo.png";
 import FotoEducacaoOnline from "../images/imagemComp.png";
+import LogoEnactus from "../images/logoEnactusRedonda.png";
+import LogoRota from "../images/RotaLogoRedondo.png";
+import ComputerLogo from "../images/ComputerLogo.png";
+import { Swiper, SwiperSlide } from "swiper/react";
+import { Navigation, Pagination, Autoplay } from "swiper/modules";
 
 export default function Home() {
   return (
@@ -40,7 +45,7 @@ export default function Home() {
           <div className="about-grid">
             <article className="about-card">
               <img
-                src="https://projetorota.com.br/wp-content/uploads/2024/04/logo-enactus-esquerda-redonda.png"
+                src={LogoEnactus}
                 alt="Liga Enactus Mackenzie"
                 className="about-icon"
               />
@@ -53,7 +58,7 @@ export default function Home() {
 
             <article className="about-card">
               <img
-                src="https://projetorota.com.br/wp-content/uploads/2024/04/Mask-group.png"
+                src={LogoRota}
                 alt="Objetivo do Projeto Rota"
                 className="about-icon"
               />
@@ -67,7 +72,7 @@ export default function Home() {
 
             <article className="about-card">
               <img
-                src="https://projetorota.com.br/wp-content/uploads/2024/04/003-computer.png"
+                src={ComputerLogo}
                 alt="Conteúdo das trilhas"
                 className="about-icon"
               />
@@ -80,6 +85,65 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+    {/* ===== Nossas Parcerias ===== */}
+<section className="partners-section" aria-labelledby="partners-title">
+  {/* shape divider BOTTOM */}
+  <div className="partners-shape-bottom" aria-hidden="true">
+    <svg viewBox="0 0 1000 100" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+      <path
+        className="partners-shape-fill"
+        d="M194,99c186.7,0.7,305-78.3,306-97.2c1,18.9,119.3,97.9,306,97.2c114.3-0.3,194,0.3,194,0.3s0-91.7,0-100c0,0,0,0,0-0 L0,0v99.3C0,99.3,79.7,98.7,194,99z"
+      />
+    </svg>
+  </div>
+
+  <div className="partners-container">
+    <h2 id="partners-title" className="partners-title">Nossas Parcerias</h2>
+
+    <Swiper
+      className="partners-swiper"
+      modules={[Navigation, Pagination, Autoplay]}
+      navigation
+      pagination={{ clickable: true }}
+      autoplay={{ delay: 5000, disableOnInteraction: false, pauseOnMouseEnter: true }}
+      speed={500}
+      loop
+      centeredSlides
+      slidesPerView={3}
+      spaceBetween={30}
+      breakpoints={{
+        320: { slidesPerView: 1, centeredSlides: true },
+        640: { slidesPerView: 2, centeredSlides: true },
+        980: { slidesPerView: 3, centeredSlides: true },
+      }}
+    >
+      <SwiperSlide>
+        <img src="https://projetorota.com.br/wp-content/uploads/2023/12/MCK_horizontal_vermelho-1-300x120.png" alt="Mackenzie" />
+      </SwiperSlide>
+      <SwiperSlide>
+        <img src="https://projetorota.com.br/wp-content/uploads/2024/04/enactus-logo-5067605AE8-seeklogo.com_.png" alt="Enactus" />
+      </SwiperSlide>
+      <SwiperSlide>
+        <img src="https://projetorota.com.br/wp-content/uploads/2024/04/Mask-group.png" alt="Mask Group" />
+      </SwiperSlide>
+      <SwiperSlide>
+        <img src="https://projetorota.com.br/wp-content/uploads/2024/06/dreams-300x136.webp" alt="Dreams" />
+      </SwiperSlide>
+      <SwiperSlide>
+        <img src="https://projetorota.com.br/wp-content/uploads/2024/06/Cia-de-talentos-1080-300x169.png" alt="Cia de Talentos" />
+      </SwiperSlide>
+      <SwiperSlide>
+        <img src="https://projetorota.com.br/wp-content/uploads/2025/05/ser-.png" alt="Ser+" />
+      </SwiperSlide>
+      <SwiperSlide>
+        <img src="https://projetorota.com.br/wp-content/uploads/2025/05/Portfolio-removebg-preview-300x239.png" alt="Portfólio" />
+      </SwiperSlide>
+    </Swiper>
+  </div>
+</section>
+
+
     </Layout>
   );
 }

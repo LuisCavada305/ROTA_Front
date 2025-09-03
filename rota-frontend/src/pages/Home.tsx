@@ -5,6 +5,13 @@ import FotoEducacaoOnline from "../images/imagemComp.png";
 import LogoEnactus from "../images/logoEnactusRedonda.png";
 import LogoRota from "../images/RotaLogoRedondo.png";
 import ComputerLogo from "../images/ComputerLogo.png";
+import MackenzieLogo from "../images/Mack.png";
+import DreamsLogo from "../images/dreams.webp";
+import SerLogo from "../images/ser.png";
+import CiaTalentosLogo from "../images/cia.png";
+import Projov from "../images/projov.png";
+import EnactusGeralLogo from "../images/enactus.png";
+import DiretoriaEnsinoLogo from "../images/diretoriaEnsino.png";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, Pagination, Autoplay } from "swiper/modules";
 
@@ -119,25 +126,28 @@ export default function Home() {
       }}
     >
       <SwiperSlide>
-        <img src="https://projetorota.com.br/wp-content/uploads/2023/12/MCK_horizontal_vermelho-1-300x120.png" alt="Mackenzie" />
+        <img src={MackenzieLogo} alt="Mackenzie" />
       </SwiperSlide>
       <SwiperSlide>
-        <img src="https://projetorota.com.br/wp-content/uploads/2024/04/enactus-logo-5067605AE8-seeklogo.com_.png" alt="Enactus" />
+        <img src={EnactusGeralLogo} alt="Enactus" />
       </SwiperSlide>
       <SwiperSlide>
-        <img src="https://projetorota.com.br/wp-content/uploads/2024/04/Mask-group.png" alt="Mask Group" />
+        <img src={LogoRota} alt="Mask Group" />
       </SwiperSlide>
       <SwiperSlide>
-        <img src="https://projetorota.com.br/wp-content/uploads/2024/06/dreams-300x136.webp" alt="Dreams" />
+        <img src={DreamsLogo} alt="Dreams" />
       </SwiperSlide>
       <SwiperSlide>
-        <img src="https://projetorota.com.br/wp-content/uploads/2024/06/Cia-de-talentos-1080-300x169.png" alt="Cia de Talentos" />
+        <img src={CiaTalentosLogo} alt="Cia de Talentos" />
       </SwiperSlide>
       <SwiperSlide>
-        <img src="https://projetorota.com.br/wp-content/uploads/2025/05/ser-.png" alt="Ser+" />
+        <img src={Projov} alt="Portfólio" />
       </SwiperSlide>
       <SwiperSlide>
-        <img src="https://projetorota.com.br/wp-content/uploads/2025/05/Portfolio-removebg-preview-300x239.png" alt="Portfólio" />
+        <img src={SerLogo} alt="Ser+" />
+      </SwiperSlide>
+      <SwiperSlide>
+        <img src={DiretoriaEnsinoLogo} alt="Portfólio" />
       </SwiperSlide>
     </Swiper>
   </div>

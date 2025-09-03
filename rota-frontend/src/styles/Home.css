@@ -8,6 +8,7 @@ body, .layout {
   background: #ffffff;
   margin: 0;
   padding: 0;
+  padding-top: 72px; /* ajuste conforme a altura real do header */
 }
 
 /* ===== HERO (sem gradiente direto aqui!) ===== */
@@ -18,7 +19,7 @@ body, .layout {
   padding: 56px 16px 20px;   /* reserva justa até a onda */
   font-family: "Poppins", system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, "Helvetica Neue", Arial;
   overflow: visible;
-  background: transparent;    /* ← azul NÃO vai aqui */
+  background: transparent;    
 }
 
 /* Gradiente + pattern vão no ::before, atrás do conteúdo */
@@ -213,13 +214,13 @@ body, .layout {
 }
 
 .partners-section .swiper-slide img{
-  max-height: 120px;
+  max-height: 250px;
   width: auto;
   object-fit: contain;
   filter: drop-shadow(0 2px 4px rgba(0,0,0,.12));
   transform: scale(.96);
 }
-.partners-section .swiper-slide-active img{ transform: scale(1.12); }
+.partners-section .swiper-slide-active img{ transform: scale(1.00); }
 
 /* Setas: chevrons brancos, sem círculo */
 .partners-section .swiper-button-prev,

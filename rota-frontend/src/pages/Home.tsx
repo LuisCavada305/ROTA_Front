@@ -1,4 +1,5 @@
 import Layout from "../components/Layout";
+import { useEffect, useState } from "react";
 import "../styles/Home.css";
 import LogoRotaSemFundo from "../images/RotaSemFundo.png";
 import FotoEducacaoOnline from "../images/imagemComp.png";
@@ -16,11 +17,47 @@ import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, Pagination, Autoplay } from "swiper/modules";
 import { http } from "../lib/http";
 
+type Trilha = {
+  id: string;
+  name: string;
+  pictureUrl: string;
+  author?: string;
+  rating?: number;          // 0..5
+  botaoLabel?: string;      // opcional
+};
+
 export default function Home() {
+  const [trilhas, setTrilhas] = useState<Trilha[]>([]);
+  const [loadingTrilhas, setLoadingTrilhas] = useState(true);
+  const [erroTrilhas, setErroTrilhas] = useState<string | null>(null);
+
   async function getTrilhasShowcase() {
-    const response = await http.get("/trilhas/showcase");
-    return response.data;
+    // espera que o back responda { trails: Trilha[] }
+    const response = await http.get("/trails/showcase");
+    return response.data.trails as Trilha[];
   }
+
+  useEffect(() => {
+    (async () => {
+      try {
+        setLoadingTrilhas(true);
+        const data = await getTrilhasShowcase();
+        setTrilhas(data ?? []);
+        setErroTrilhas(null);
+      } catch (e: any) {
+        setErroTrilhas(e?.message || "Erro ao buscar trilhas.");
+      } finally {
+        setLoadingTrilhas(false);
+      }
+    })();
+  }, []);
+
+  function handleMatricular(id: string) {
+    // aqui você chama sua rota de matrícula (ex.: POST /matriculas { trilhaId })
+    // http.post("/matriculas", { trilhaId: id });
+    alert(`Matricular-se na trilha ${id} (implementar chamada)`);
+  }
+
 
   return (
     <Layout>
@@ -159,7 +196,74 @@ export default function Home() {
   </div>
 </section>
 
+{/* ===== Nossas Trilhas ===== */}
+      <section className="tracks-section" aria-labelledby="tracks-title">
+        <div className="tracks-container">
+          <h2 id="tracks-title" className="tracks-title">Nossas Trilhas</h2>
 
+          {loadingTrilhas && (
+            <div className="tracks-grid">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="track-card skeleton" />
+              ))}
+            </div>
+          )}
+
+          {erroTrilhas && !loadingTrilhas && (
+            <div className="tracks-error">{erroTrilhas}</div>
+          )}
+
+          {!loadingTrilhas && !erroTrilhas && (
+            <div className="tracks-grid">
+              {trilhas.map((t) => (
+                <article key={t.id} className="track-card">
+                  <div className="track-cover">
+                    <img src={t.pictureUrl} alt={t.name} loading="lazy" />
+                    {/* marcador/ícone opcional no canto */}
+                    <button
+                      className="track-pin"
+                      aria-label="Salvar trilha"
+                      title="Salvar trilha"
+                      onClick={() => console.log("pin", t.id)}
+                    >
+                      🔖
+                    </button>
+                  </div>
+
+                  <div className="track-body">
+                    <div className="track-rating" aria-label={`Avaliação ${t.rating ?? 0} de 5`}>
+                      {Array.from({ length: 5 }).map((_, idx) => (
+                        <span
+                          key={idx}
+                          className={idx < (t.rating ?? 0) ? "star filled" : "star"}
+                        >
+                          ★
+                        </span>
+                      ))}
+                    </div>
+
+                    <h3 className="track-title">{t.name}</h3>
+
+                    <div className="track-author">
+                      <div className="avatar">PR</div>
+                      <span>By {t.author ?? "Projeto Rota"}</span>
+                    </div>
+                  </div>
+
+                  <div className="track-footer">
+                    <button
+                      className="track-btn"
+                      onClick={() => handleMatricular(t.id)}
+                    >
+                      {t.botaoLabel ?? "Matricular-se no Curso"}
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
     </Layout>
   );
 }

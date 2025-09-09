@@ -2,7 +2,7 @@ import { useState } from "react";
 import "../styles/Header.css";
 import LogoRota from "../images/LogoRotaHeader.png";
 import { Home, GraduationCap, Users, MessageSquare, Search, Menu, X } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, NavLink } from "react-router-dom";
 
 export default function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -42,28 +42,28 @@ export default function Header() {
         <nav id="site-navigation" className="main-navigation desktop-nav">
           <ul className="primary-menu">
             <li className="menu-item">
-              <Link to="/">
+              <NavLink to="/" end className={({ isActive }) => (isActive ? "active" : undefined)}>
                 <Home size={18} />
                 <span>Home</span>
-              </Link>
+              </NavLink>
             </li>
             <li className="menu-item current-menu-item">
-              <Link to="/trilhas">
+              <NavLink to="/trilhas" className={({ isActive }) => (isActive ? "active" : undefined)}>
                 <GraduationCap size={18} />
                 <span>Trilhas</span>
-              </Link>
+              </NavLink>
             </li>
             <li className="menu-item">
-              <Link to="/membros">
+              <NavLink to="/membros" className={({ isActive }) => (isActive ? "active" : undefined)}>
                 <Users size={18} />
                 <span>Membros Enactus</span>
-              </Link>
+              </NavLink>
             </li>
             <li className="menu-item">
-              <Link to="/forum">
+              <NavLink to="/forum" className={({ isActive }) => (isActive ? "active" : undefined)}>
                 <MessageSquare size={18} />
                 <span>Fóruns</span>
-              </Link>
+              </NavLink>
             </li>
           </ul>
         </nav>
@@ -90,14 +90,15 @@ export default function Header() {
     <X size={22} />
   </button>
   <ul className="mobile-menu">
-    <li><Link to="/" onClick={closeMobile}><Home size={18} /><span>Home</span></Link></li>
-    <li><Link to="/trilhas" onClick={closeMobile}><GraduationCap size={18} /><span>Trilhas</span></Link></li>
-    <li><Link to="/membros" onClick={closeMobile}><Users size={18} /><span>Membros Enactus</span></Link></li>
-    <li><Link to="/forum" onClick={closeMobile}><MessageSquare size={18} /><span>Fóruns</span></Link></li>
-  </ul>
+  <li><NavLink to="/" end onClick={closeMobile} className={({isActive})=>isActive?'active':undefined}><Home size={18}/><span>Home</span></NavLink></li>
+  <li><NavLink to="/trilhas" onClick={closeMobile} className={({isActive})=>isActive?'active':undefined}><GraduationCap size={18}/><span>Trilhas</span></NavLink></li>
+  <li><NavLink to="/membros" onClick={closeMobile} className={({isActive})=>isActive?'active':undefined}><Users size={18}/><span>Membros Enactus</span></NavLink></li>
+  <li><NavLink to="/forum" onClick={closeMobile} className={({isActive})=>isActive?'active':undefined}><MessageSquare size={18}/><span>Fóruns</span></NavLink></li>
+</ul>
+
   <div className="mobile-actions">
-    <Link to="/login" className="signin-button" onClick={closeMobile}>Entrar</Link>
-    <Link to="/registro" className="signup" onClick={closeMobile}>Inscrever-se</Link>
+    <NavLink to="/login" className="signin-button" onClick={closeMobile}>Entrar</NavLink>
+    <NavLink to="/registro" className="signup" onClick={closeMobile}>Inscrever-se</NavLink>
   </div>
 </nav>
 

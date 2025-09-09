@@ -49,7 +49,7 @@
   align-items: center;
   gap: .5rem;
   color: #1e2132;
-  font-weight: 500;
+  font-weight: 500; 
   text-decoration: none;
   padding-bottom: 10px; /* espaço para underline */
   transition: color .2s ease;
@@ -57,10 +57,9 @@
 }
 
 .primary-menu .menu-item > a:hover { color: #0365ba; }
-.primary-menu .menu-item.current-menu-item > a { color: #0365ba; }
+.primary-menu .menu-item > a.active { color: #0365ba; }
 
-/* underline do item ativo no desktop */
-.primary-menu .menu-item.current-menu-item > a::after {
+.primary-menu .menu-item > a.active::after {
   content: "";
   position: absolute;
   bottom: 0; left: 0;
@@ -69,6 +68,13 @@
   background: #0365ba;
   border-radius: 2px;
 }
+
+/* opcional para o mobile */
+.mobile-menu a.active {
+  color: #0365ba;
+  background: #f5f7fa;
+}
+
 
 /* ===== Ações (desktop) ===== */
 .desktop-actions { display: flex; align-items: center; gap: 1.5rem; }
@@ -86,32 +92,58 @@
 
 .header-search-link:hover { color: #0365ba; }
 
-.search-separator {
-  width: 1px; height: 24px; background: #e5e7eb;
+.search-separator{
+  width: 1px;
+  height: 22px;
+  background: #e5e7eb;
   display: inline-block;
+  margin: 0 6px;
 }
 
-.bb-header-buttons { display: flex; gap: 1rem; }
-.bb-header-buttons a {
-  font-size: .9rem;
-  padding: .5rem 1rem;
-  border-radius: .375rem;
-  text-decoration: none;
-  transition: all .2s ease;
+
+.bb-header-buttons{
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ENTRAR: link visual, mas com a mesma altura do botão */
+.bb-header-buttons .signin-button,
+.bb-header-buttons .signup{
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  height: 32px;            /* iguais */
+  padding: 0 12px;         /* iguais */
+  box-sizing: border-box;
+  border-radius: 6px;
+  text-decoration: none;
+  font-size: .9rem;
+  line-height: 1;          /* evita variar por tipografia */
 }
 
-.bb-header-buttons .signin-button {
-  border: 1px solid #0365ba;
-  color: #0365ba;
+/* Diferenças visuais */
+.bb-header-buttons .signin-button{
   background: transparent;
+  border: 1px solid transparent; /* mantém caixa igual sem “pular” */
+  color: #0365ba;
+  font-weight: 500;
 }
-.bb-header-buttons .signin-button:hover { background: #0365ba; color: #fff; }
 
-.bb-header-buttons .signup { background: #0365ba; color: #fff; }
-.bb-header-buttons .signup:hover { background: #024a87; }
+.bb-header-buttons .signin-button:hover{
+  text-decoration:underline;
+}
+
+.bb-header-buttons .signup{
+  background: #0b61b7;
+  border: 1px solid transparent;
+  color: #fff;
+  font-weight: 600;
+}
+.bb-header-buttons .signup:hover{ background:#0a56a4; }
+
+
+
 
 /* ===== Mobile toggle ===== */
 .mobile-toggle {
@@ -180,7 +212,9 @@
   align-items: center;
   gap: 10px;
   color: #1e2132;
-  text-decoration: none;
+  text-decoration: none !important;
+  text-decoration: none !important;
+  text-decoration: none !important;
   padding: 10px 6px;
   border-radius: 6px;
   transition: background .15s ease, color .15s ease;
@@ -321,4 +355,49 @@
 @media (max-width: 560px){
   .partners-title{ font-size: 1.6rem; }
   .partners-section .swiper-slide img{ max-height: 84px; }
+}
+
+/* ===== ALINHAMENTO FINAL DOS BOTÕES (força a mesma caixa) ===== */
+.site-header .desktop-actions,
+.site-header .bb-header-buttons{
+  display: flex;
+  align-items: center;         /* centraliza verticalmente com menu/logo */
+  gap: 12px;
+}
+
+.site-header .bb-header-buttons .signin-button,
+.site-header .bb-header-buttons .signup{
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  height: 32px !important;     /* mesma altura */
+  padding: 0 12px !important;  /* mesma largura interna */
+  margin: 0 !important;
+
+  border: 1px solid transparent !important; /* mesma espessura de borda */
+  box-sizing: border-box !important;
+  line-height: 1 !important;
+  text-decoration: none !important;
+}
+
+/* diferenças visuais */
+.site-header .bb-header-buttons .signin-button{
+  background: transparent !important;
+  color: #0365ba !important;
+  font-weight: 500 !important;
+}
+
+.site-header .bb-header-buttons .signup{
+  background: #0b61b7 !important;
+  color: #fff !important;
+  font-weight: 600 !important;
+}
+.site-header .bb-header-buttons .signup:hover{ background:#0a56a4 !important; }
+
+/* opcional: underline do menu fora da caixa, evita “puxar” a altura do header */
+.site-header .primary-menu .menu-item > a{ padding-bottom: 0 !important; }
+.site-header .primary-menu .menu-item > a.active::after{
+  bottom: -6px !important;
+  height: 2px !important;
 }

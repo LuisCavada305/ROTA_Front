@@ -94,3 +94,43 @@
   color: #6b7280;
   text-align: center;
 }
+
+.login-error {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+
+  background-color: #f44336; /* vermelho erro */
+  color: #fff;
+  padding: 12px 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+
+  font-size: 14px;
+  font-weight: 500;
+  max-width: 300px;
+  line-height: 1.4;
+
+  opacity: 0;
+  transform: translateY(-20px);
+
+  /* animações em sequência: entrar, esperar, sair */
+  animation: slideDownFade 0.3s ease-out forwards,
+             fadeOut 0.5s ease-in forwards 4s; /* começa a sumir após 4s */
+}
+
+@keyframes slideDownFade {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeOut {
+  to {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+}
+

@@ -5,7 +5,8 @@ import { NavLink } from "react-router-dom";
 import { useState } from "react";
 import { http } from "../lib/http";
 import axios from "axios";
-
+import CookieError
+ from "../components/CookieErrorPopup";
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -42,6 +43,7 @@ export default function Login() {
         <div className="login-card clean">
           <img className="login-logo" src={Logo} alt="ROTA" />
 
+          <CookieError />
           <div className="form-head">
             <h2 className="head-left">Entrar</h2>
             <NavLink className="head-right" to="/register">
@@ -76,8 +78,6 @@ export default function Login() {
               />
             </div>
 
-            <div className="login-error" role="alert" aria-live="polite">{err}</div>
-
             <div className="login-aux">
               <label className="form-check">
                 <input
@@ -98,8 +98,8 @@ export default function Login() {
                 Esqueceu sua senha?
               </NavLink>
             </div>
-
-            <div className="login-error" role="alert" aria-live="polite">{err}</div>
+           
+            {err && <div className="login-error" role="alert" aria-live="polite">{err}</div>}
 
             <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
               {loading ? "Entrando..." : "Acessar"}

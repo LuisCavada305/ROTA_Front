@@ -8,6 +8,29 @@ import axios from "axios";
 import CookieError from "../components/CookieErrorPopup";
 
 export default function Register() {
+        // SVGs para ícone de visibilidade
+        const EyeIcon = (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+        );
+        const EyeOffIcon = (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a21.77 21.77 0 0 1 5.06-7.94"></path><path d="M1 1l22 22"></path><path d="M9.53 9.53A3 3 0 0 0 12 15a3 3 0 0 0 2.47-5.47"></path></svg>
+        );
+    // Função para formatar data para dd/mm/yyyy
+    function formatDateToDDMMYYYY(dateStr: string) {
+        if (!dateStr) return "";
+        const [year, month, day] = dateStr.split("-");
+        if (!year || !month || !day) return dateStr;
+        return `${day}/${month}/${year}`;
+    }
+
+    // Função para converter dd/mm/yyyy para yyyy-mm-dd
+    function formatDateToYYYYMMDD(dateStr: string) {
+        if (!dateStr) return "";
+        const [day, month, year] = dateStr.split("/");
+        if (!year || !month || !day) return dateStr;
+        return `${year}-${month}-${day}`;
+    }
+
     const [showPassword, setShowPassword] = useState(false);
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
@@ -29,7 +52,7 @@ export default function Register() {
             email: email.trim(),
             password,
             name_for_certificate,
-            birthday,
+            birthday: formatDateToYYYYMMDD(birthday),
             social_name,
             username
         };
@@ -64,33 +87,7 @@ export default function Register() {
             </div>
 
             <form id="tutor-login-form" method="post" onSubmit={handleSubmit}>
-                                <div className="form-field">
-                                    <input
-                                        type="text"
-                                        className="form-control with-icon icon-user"
-                                        placeholder="Nome social"
-                                        name="social_name"
-                                        autoComplete="name"
-                                        required
-                                        value={social_name}
-                                        onChange={(e) => setSocialName(e.target.value)}
-                                    />
-                                </div>
-
-                                <div className="form-field">
-                                    <input
-                                        type="text"
-                                        className="form-control with-icon icon-user"
-                                        placeholder="Nome de usuário"
-                                        name="username"
-                                        autoComplete="username"
-                                        required
-                                        value={username}
-                                        onChange={(e) => setUsername(e.target.value)}
-                                    />
-                                </div>
-
-                                <div className="form-field">
+                                 <div className="form-field">
                                     <input
                                         type="email"
                                         className="form-control with-icon icon-user"
@@ -107,7 +104,31 @@ export default function Register() {
                                     <input
                                         type="text"
                                         className="form-control with-icon icon-user"
-                                        placeholder="Nome para certificado"
+                                        placeholder="Nome de usuário"
+                                        name="username"
+                                        autoComplete="username"
+                                        required
+                                        value={username}
+                                        onChange={(e) => setUsername(e.target.value)}
+                                    />
+                                </div>
+        
+                                <div className="form-field">
+                                    <input
+                                        type="text"
+                                        className="form-control with-icon icon-user"
+                                        placeholder="Nome social (Opcional)"
+                                        autoComplete="name"
+                                        value={social_name}
+                                        onChange={(e) => setSocialName(e.target.value)}
+                                    />
+                                </div>
+
+                                <div className="form-field">
+                                    <input
+                                        type="text"
+                                        className="form-control with-icon icon-user"
+                                        placeholder="Nome para os certificados"
                                         name="name_for_certificate"
                                         autoComplete="name"
                                         required
@@ -118,18 +139,27 @@ export default function Register() {
 
                                 <div className="form-field">
                                     <input
-                                        type="date"
+                                        type="text"
                                         className="form-control with-icon icon-lock"
-                                        placeholder="Data de nascimento"
+                                        placeholder="Data de nascimento (dd/mm/yyyy)"
                                         name="birthday"
                                         autoComplete="bday"
                                         required
                                         value={birthday}
-                                        onChange={(e) => setBirthday(e.target.value)}
+                                        onChange={(e) => {
+                                            let v = e.target.value.replace(/[^\d\/]/g, "");
+                                            // Adiciona barra automaticamente
+                                            if (v.length === 2 && birthday.length === 1) v += "/";
+                                            if (v.length === 5 && birthday.length === 4) v += "/";
+                                            // Limita a 10 caracteres
+                                            v = v.slice(0, 10);
+                                            setBirthday(v);
+                                        }}
+                                        pattern="^(0[1-9]|[12][0-9]|3[01])\/(0[1-9]|1[0-2])\/\d{4}$"
                                     />
                                 </div>
 
-                                <div className="form-field" style={{ position: "relative" }}>
+                               <div className="form-field password-field">
                                     <input
                                         type={showPassword ? "text" : "password"}
                                         className="form-control with-icon icon-lock"
@@ -139,23 +169,17 @@ export default function Register() {
                                         required
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
-                                        style={{ paddingRight: "2.5rem" }}
                                     />
-                                    <span
+
+                                    <button
+                                        type="button"
+                                        className="password-visibility"
                                         onClick={() => setShowPassword((v) => !v)}
-                                        style={{
-                                            position: "absolute",
-                                            right: "10px",
-                                            top: "50%",
-                                            transform: "translateY(-50%)",
-                                            cursor: "pointer",
-                                            fontSize: "1.2rem",
-                                            color: "#888"
-                                        }}
                                         aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                                        title={showPassword ? "Ocultar senha" : "Mostrar senha"}
                                     >
-                                        {showPassword ? "🙈" : "👁️"}
-                                    </span>
+                                        {showPassword ? EyeOffIcon : EyeIcon}
+                                    </button>
                                 </div>
                 
                 <div className="login-aux">

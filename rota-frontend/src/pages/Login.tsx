@@ -25,7 +25,7 @@ export default function Login() {
     try {
       const res = await http.post("/auth/login", payload, { withCredentials: true });
       console.log("Login OK:", res.data);
-      window.location.href = "/"; // redireciona para a home
+      // window.location.href = "/"; // redireciona para a home
     } catch (error) {
       if (axios.isAxiosError(error)) {
         setErr((error.response?.data as any)?.message || "Falha no login");

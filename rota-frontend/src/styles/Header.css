@@ -401,3 +401,95 @@
   bottom: -6px !important;
   height: 2px !important;
 }
+
+/* Avatar padrões */
+.avatar-img {
+  border-radius: 999px;
+  display: block;
+  object-fit: cover;
+}
+.avatar-fallback {
+  border-radius: 999px;
+  background: #e5e7eb;
+  color: #374151;
+  font-weight: 700;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Botão compacto com avatar + nome, alinhado às ações do header */
+.user-menu {
+  position: relative;
+}
+.user-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: #f8fafc;
+  color: #1e2132;
+  cursor: pointer;
+}
+.user-button:hover { background: #eff3f8; }
+.user-button .user-name {
+  max-width: 180px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-weight: 600;
+  font-size: .9rem;
+}
+.user-button .chev { opacity: .7; }
+
+/* Dropdown */
+.user-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 200px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 8px 20px rgba(0,0,0,.08);
+  border-radius: 10px;
+  padding: 8px;
+  z-index: 1001;
+}
+.user-dropdown a,
+.user-dropdown button.logout-btn {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-decoration: none;
+  color: #1e2132;
+  font-size: .95rem;
+  padding: 10px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.user-dropdown a:hover,
+.user-dropdown button.logout-btn:hover {
+  background: #f5f7fa;
+  color: #0365ba;
+}
+
+/* Bloco no mobile drawer */
+.user-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.user-inline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 4px;
+}
+.user-inline-name {
+  font-weight: 700;
+  color: #1e2132;
+}

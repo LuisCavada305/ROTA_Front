@@ -6,6 +6,7 @@ import { useState } from "react";
 import { http } from "../lib/http";
 import axios from "axios";
 import CookieError from "../components/CookieErrorPopup";
+import { Sex, sexOptions } from '../types/sex';
 
 export default function Register() {
         // SVGs para ícone de visibilidade
@@ -33,6 +34,7 @@ export default function Register() {
 
     const [showPassword, setShowPassword] = useState(false);
     const [email, setEmail] = useState("");
+    const [sex, setSex] = useState("");
     const [password, setPassword] = useState("");
     const [name_for_certificate, setNameForCertificate] = useState("");
     const [social_name, setSocialName] = useState("");
@@ -54,16 +56,17 @@ export default function Register() {
             name_for_certificate,
             birthday: formatDateToYYYYMMDD(birthday),
             social_name,
-            username
+            username,
+            sex
         };
 
         try {
-        const res = await http.post("/auth/login", payload, { withCredentials: true });
-        console.log("Login OK:", res.data);
+        const res = await http.post("/auth/register", payload);
+        console.log("Registro OK:", res.data);
         window.location.href = "/"; // redireciona para a home
         } catch (error) {
         if (axios.isAxiosError(error)) {
-            setErr((error.response?.data as any)?.message || "Falha no login");
+            setErr((error.response?.data as any)?.message || "Falha no registro");
         } else {
             setErr("Erro inesperado. Tente novamente.");
         }
@@ -122,6 +125,22 @@ export default function Register() {
                                         value={social_name}
                                         onChange={(e) => setSocialName(e.target.value)}
                                     />
+                                </div>
+
+                                  <div className="form-field">
+
+                                <select
+                                    id="sex"
+                                    name="sex"
+                                    className="form-control with-icon icon-user"
+                                    value={sex}
+                                    onChange={(e) => setSex(e.target.value as Sex)}
+                                >
+                                    <option value="" disabled>Sexo</option>
+                                    {sexOptions.map(opt => (
+                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                    ))}
+                                </select>
                                 </div>
 
                                 <div className="form-field">

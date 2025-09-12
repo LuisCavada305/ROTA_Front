@@ -169,3 +169,49 @@
   }
 }
 
+/* SELECT com visual idêntico ao .form-control */
+select.form-control {
+  /* reset/seta nativa */
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+
+  box-sizing: content-box;
+  /* mesmo “look” do input */
+  width: 100%;
+  height: 44px;
+  min-height: 44px;           /* Safari/Firefox */
+  padding: 0 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  outline: none;
+  font-size: 14px;
+  line-height: normal;
+  background-color: #fff;
+  background-clip: padding-box;
+
+  /* setinha (chevron) SVG embutida */
+  background-image: url("data:image/svg+xml;utf8,\
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%239CA3AF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>\
+<polyline points='6,8 10,12 14,8'/>\
+</svg>");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px 16px;
+}
+
+/* foco igual aos outros campos */
+select.form-control:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+}
+
+/* remove seta legada do IE/Edge antigo (se existir) */
+select.form-control::-ms-expand { display: none; }
+
+/* opção “placeholder” opaca (se usar <option disabled selected>) */
+select.form-control:invalid,
+select.form-control option[disabled] {
+  color: #9ca3af;
+}
+

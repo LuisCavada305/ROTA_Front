@@ -419,3 +419,63 @@ body, .layout {
 @media (max-width: 560px){
   .tracks-title { font-size: 1.6rem; }
 }
+
+.tracks-loading,
+.tracks-empty,
+.tracks-error {
+  margin: 1rem 0;
+  text-align: center;
+}
+
+.tracks-error {
+  color: #b00020;
+}
+
+.tracks-pagination {
+  display: flex;
+  gap: .5rem;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.tracks-pagination .page-btn,
+.tracks-pagination .page-number {
+  border: 1px solid #ddd;
+  background: #fff;
+  padding: .45rem .7rem;
+  border-radius: .5rem;
+  cursor: pointer;
+}
+
+.tracks-pagination .page-number.is-current {
+  background: #0b5ed7;
+  border-color: #0b5ed7;
+  color: #fff;
+  cursor: default;
+}
+
+.tracks-pagination .page-btn[disabled],
+.tracks-pagination .page-number[disabled] {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
+.tracks-pagination .page-list {
+  display: flex;
+  gap: .25rem;
+  list-style: none;
+  margin: 0 .25rem;
+  padding: 0;
+}
+
+.tracks-pagination .page-ellipsis {
+  padding: .45rem .4rem;
+  color: #666;
+}
+
+.page-status {
+  font-size: .9rem;
+  color: #555;
+}

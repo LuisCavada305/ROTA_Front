@@ -16,15 +16,7 @@ import DiretoriaEnsinoLogo from "../images/diretoriaEnsino.png";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, Pagination, Autoplay } from "swiper/modules";
 import { http } from "../lib/http";
-
-type Trilha = {
-  id: string;
-  name: string;
-  pictureUrl: string;
-  author?: string;
-  rating?: number;          // 0..5
-  botaoLabel?: string;      // opcional
-};
+import type { Trilha } from "../types/Trilha";
 
 export default function Home() {
   const [trilhas, setTrilhas] = useState<Trilha[]>([]);
@@ -218,7 +210,7 @@ export default function Home() {
               {trilhas.map((t) => (
                 <article key={t.id} className="track-card">
                   <div className="track-cover">
-                    <img src={t.pictureUrl} alt={t.name} loading="lazy" />
+                    <img src={t.thumbnail_url} alt={t.name} loading="lazy" />
                     {/* marcador/ícone opcional no canto */}
                     <button
                       className="track-pin"

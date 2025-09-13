@@ -3,7 +3,7 @@ import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import AuthGate from "./components/AuthGate";
-// import Trails from "./pages/Trails";
+import Trails from "./pages/Trails";
 // import Members from "./pages/Members";
 // import Forum from "./pages/Forum";
 // import Trail from "./pages/Trail";
@@ -18,10 +18,11 @@ export default function App() {
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/registro" element={<Register />} />
+        <Route path="/trilhas" element={<Trails />} />
         {/* 
         <Route path="/membros" element={<Members />} />
         
-        <Route path="/trilhas" element={<Trails />} />
+        
         <Route path="/forum" element={<Forum />} />
         <Route path="/trilha/:id" element={<Trail />} /> */}
       </Routes>

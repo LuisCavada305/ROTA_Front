@@ -102,7 +102,7 @@ export default function Header() {
               >
 
                 <span className="user-name">{user.username}</span>
-                <Avatar name={user.username} src={user.avatarUrl ?? null} />
+                <Avatar name={user.username} src={user.profile_pic_url ?? null} />
                 <ChevronDown size={16} className="chev" />
               </button>
               {userMenuOpen && (
@@ -144,7 +144,7 @@ export default function Header() {
           {!loading && user ? (
             <div className="user-block">
               <div className="user-inline">
-                <Avatar name={user.username} src={user.avatarUrl} size={32}/>
+                <Avatar name={user.username} src={user.profile_pic_url} size={32}/>
                 <div className="user-inline-name">{user.username}</div>
               </div>
               <NavLink to="/painel" onClick={closeMobile}>Painel</NavLink>

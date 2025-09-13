@@ -4,7 +4,8 @@ import { http } from "../lib/http";
 export type User = {
   id: string;
   username: string;
-  avatarUrl?: string | null;
+  profile_pic_url?: string | null;
+  banner_pic_url?: string | null;
   role: string;
   email: string;
 };

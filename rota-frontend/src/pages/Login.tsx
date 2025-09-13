@@ -7,6 +7,7 @@ import { http } from "../lib/http";
 import axios from "axios";
 import CookieError
  from "../components/CookieErrorPopup";
+
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -23,12 +24,12 @@ export default function Login() {
     const payload = { email: email.trim(), password, remember };
 
     try {
-      const res = await http.post("/auth/login", payload, { withCredentials: true });
+      const res = await http.post("/auth/login", payload, { suppressAuthModal: true });
       console.log("Login OK:", res.data);
       window.location.href = "/"; // redireciona para a home
     } catch (error) {
       if (axios.isAxiosError(error)) {
-        setErr((error.response?.data as any)?.message || "Falha no login");
+        setErr((error.response?.data as any)?.detail || "Falha no login");
       } else {
         setErr("Erro inesperado. Tente novamente.");
       }

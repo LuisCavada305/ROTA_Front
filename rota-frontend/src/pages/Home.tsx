@@ -45,7 +45,7 @@ export default function Home() {
         setTrilhas(data ?? []);
         setErroTrilhas(null);
       } catch (e: any) {
-        setErroTrilhas(e?.message || "Erro ao buscar trilhas.");
+        setErroTrilhas(e?.detail || "Erro ao buscar trilhas.");
       } finally {
         setLoadingTrilhas(false);
       }

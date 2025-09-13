@@ -61,12 +61,12 @@ export default function Register() {
         };
 
         try {
-        const res = await http.post("/auth/register", payload);
-        console.log("Registro OK:", res.data);
+        const res = await http.post("/auth/register", payload, { suppressAuthModal: true });
+        console.log("Registro e login OK:", res.data);
         window.location.href = "/"; // redireciona para a home
         } catch (error) {
         if (axios.isAxiosError(error)) {
-            setErr((error.response?.data as any)?.message || "Falha no registro");
+            setErr((error.response?.data as any)?.detail || "Falha no registro");
         } else {
             setErr("Erro inesperado. Tente novamente.");
         }

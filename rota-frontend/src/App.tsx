@@ -2,6 +2,7 @@ import { Routes, Route } from "react-router-dom";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import AuthGate from "./components/AuthGate";
 // import Trails from "./pages/Trails";
 // import Members from "./pages/Members";
 // import Forum from "./pages/Forum";
@@ -12,6 +13,7 @@ import Register from "./pages/Register";
 export default function App() {
   return (
     <>
+      <AuthGate />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />

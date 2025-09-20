@@ -3,6 +3,7 @@ import '../styles/Home.css';
 import type { Trilha } from "../types/Trilha";
 import { http } from "../lib/http";
 import Layout from '../components/Layout';
+import { Link } from 'lucide-react';
 
 const PAGE_SIZE = 8;
 
@@ -103,27 +104,20 @@ export default function Trails() {
 
       {!loadingTrilhas && !erroTrilhas && trilhas.length > 0 && (
         <>
-          <div className="tracks-grid">
+          <div className="tracks-grid" style={{ paddingTop: 50 }}>
             {pageItems.map((t) => (
               <article key={t.id} className="track-card">
-                <div className="track-cover">
+              <div className="track-cover">
+                <a href={`/trail-details/${t.id}`}>
                   <img src={t.thumbnail_url} alt={t.name} loading="lazy" />
-                  <button
-                    className="track-pin"
-                    aria-label="Salvar trilha"
-                    title="Salvar trilha"
-                    onClick={() => console.log("pin", t.id)}
-                  >
-                    🔖
-                  </button>
-                </div>
-
+                </a>
+              </div>
                 <div className="track-body">
-                  <div className="track-rating" aria-label={`Avaliação ${t.rating ?? 0} de 5`}>
+                  <div className="track-rating" aria-label={`Avaliação ${t.review ?? 0} de 5`}>
                     {Array.from({ length: 5 }).map((_, idx) => (
                       <span
                         key={idx}
-                        className={idx < (t.rating ?? 0) ? "star filled" : "star"}
+                        className={idx < (t.review ?? 0) ? "star filled" : "star"}
                       >
                         ★
                       </span>
@@ -131,11 +125,6 @@ export default function Trails() {
                   </div>
 
                   <h3 className="track-title">{t.name}</h3>
-
-                  <div className="track-author">
-                    <div className="avatar">PR</div>
-                    <span>By {t.author ?? "Projeto Rota"}</span>
-                  </div>
                 </div>
 
                 <div className="track-footer">

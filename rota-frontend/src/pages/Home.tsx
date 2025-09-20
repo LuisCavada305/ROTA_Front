@@ -211,23 +211,14 @@ export default function Home() {
                 <article key={t.id} className="track-card">
                   <div className="track-cover">
                     <img src={t.thumbnail_url} alt={t.name} loading="lazy" />
-                    {/* marcador/ícone opcional no canto */}
-                    <button
-                      className="track-pin"
-                      aria-label="Salvar trilha"
-                      title="Salvar trilha"
-                      onClick={() => console.log("pin", t.id)}
-                    >
-                      🔖
-                    </button>
                   </div>
 
                   <div className="track-body">
-                    <div className="track-rating" aria-label={`Avaliação ${t.rating ?? 0} de 5`}>
+                    <div className="track-rating" aria-label={`Avaliação ${t.review ?? 0} de 5`}>
                       {Array.from({ length: 5 }).map((_, idx) => (
                         <span
                           key={idx}
-                          className={idx < (t.rating ?? 0) ? "star filled" : "star"}
+                          className={idx < (t.review ?? 0) ? "star filled" : "star"}
                         >
                           ★
                         </span>
@@ -235,11 +226,6 @@ export default function Home() {
                     </div>
 
                     <h3 className="track-title">{t.name}</h3>
-
-                    <div className="track-author">
-                      <div className="avatar">PR</div>
-                      <span>By {t.author ?? "Projeto Rota"}</span>
-                    </div>
                   </div>
 
                   <div className="track-footer">

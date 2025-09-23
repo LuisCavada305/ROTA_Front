@@ -7,7 +7,7 @@ import Trails from "./pages/Trails";
 import CourseDetails from "./pages/TrailDetails";
 // import Members from "./pages/Members";
 // import Forum from "./pages/Forum";
-// import Trail from "./pages/Trail";
+import Trail from "./pages/Trail";
 
 
 
@@ -21,12 +21,13 @@ export default function App() {
         <Route path="/registro" element={<Register />} />
         <Route path="/trilhas" element={<Trails />} />
         <Route path="/trail-details/:id" element={<CourseDetails />} />
+        <Route path="/trilha/:trailId/aula/:itemId" element={<Trail />} />
         {/* 
         <Route path="/membros" element={<Members />} />
         
         
         <Route path="/forum" element={<Forum />} />
-        <Route path="/trilha/:id" element={<Trail />} /> */}
+         */}
       </Routes>
     </>
   );

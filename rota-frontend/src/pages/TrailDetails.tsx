@@ -2,7 +2,7 @@ import Layout from "../components/Layout";
 import "../styles/TrailDetails.css";
 import { http } from "../lib/http";
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 
 type SectionItem = {
   id: number;
@@ -337,9 +337,12 @@ export default function TrailDetails() {
                     <span style={{ width: `${pct}%` }} />
                   </div>
                 </div>
-                <button className="btn btn-primary btn-block">
+                <Link
+                  to={`/trilha/${vm.id}/aula/${vm.sections[0]?.items[0]?.id ?? ""}`}
+                  className="btn btn-primary btn-block"
+                >
                   {vm.progress.nextAction ?? "Continuar"}
-                </button>
+                </Link>
                 <ul className="mini-list">
                   <li>Conclua todas as lições para marcar este curso como concluído</li>
                   {vm.nextLessonDate && (

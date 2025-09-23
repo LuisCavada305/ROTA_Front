@@ -177,3 +177,40 @@
 /* Certificado compacto */
 .cert-grid{ grid-template-columns: 1fr 240px; gap:14px; }
 .cert-img img{ border-radius: 8px; }
+
+/* === Botões (button e <a>) unificados === */
+.btn, a.btn {
+  display: inline-flex;              /* centraliza texto igual button */
+  align-items: center;
+  justify-content: center;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  font-weight: 600;
+  line-height: 1;                    /* evita “crescer” no <a> */
+  text-decoration: none;             /* remove sublinhado do <a> */
+}
+
+/* estados do anchor */
+a.btn:hover,
+a.btn:focus,
+a.btn:active,
+a.btn:visited { text-decoration: none; }
+
+/* variaçõezinhas da cor/visited */
+.btn-primary, a.btn-primary { 
+  background: var(--brand); 
+  color: #fff; 
+  border-color: var(--brand);
+  box-sizing: border-box;
+}
+a.btn-primary:visited { color: #fff; }
+
+.btn-ghost, a.btn-ghost { background: #fff; }
+
+/* botão em largura total (só use se quiser 100%) */
+.btn-block, a.btn-block { 
+  width: 100%; 
+  display: flex;       /* garante centralização também no <a> */
+}

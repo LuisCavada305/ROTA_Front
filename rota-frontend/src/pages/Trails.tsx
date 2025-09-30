@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import '../styles/Home.css';
 import type { Trilha } from "../types/Trilha";
 import { http } from "../lib/http";
@@ -24,10 +25,10 @@ export default function Trails() {
   const [erroTrilhas, setErroTrilhas] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState<PaginationMeta | null>(null);
+  const navigate = useNavigate();
 
-  function handleMatricular(id: number) {
-    // http.post("/matriculas", { trilhaId: id });
-    alert(`Matricular-se na trilha ${id} (implementar chamada)`);
+  function handleMatricular(trail: Trilha) {
+    navigate(`/trail-details/${trail.id}`);
   }
 
   useEffect(() => {
@@ -182,7 +183,7 @@ export default function Trails() {
                 <div className="track-footer">
                   <button
                     className="track-btn"
-                    onClick={() => handleMatricular(t.id)}
+                    onClick={() => handleMatricular(t)}
                   >
                     {actionLabel}
                   </button>

@@ -1,5 +1,6 @@
 import Layout from "../components/Layout";
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import "../styles/Home.css";
 import LogoRotaSemFundo from "../images/RotaSemFundo.png";
 import FotoEducacaoOnline from "../images/imagemComp.png";
@@ -33,6 +34,7 @@ export default function Home() {
   const [trilhas, setTrilhas] = useState<Trilha[]>([]);
   const [loadingTrilhas, setLoadingTrilhas] = useState(true);
   const [erroTrilhas, setErroTrilhas] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   async function getTrilhasShowcase() {
     // espera que o back responda { trails: Trilha[] }
@@ -55,10 +57,8 @@ export default function Home() {
     })();
   }, []);
 
-  function handleMatricular(id: number) {
-    // aqui você chama sua rota de matrícula (ex.: POST /matriculas { trilhaId })
-    // http.post("/matriculas", { trilhaId: id });
-    alert(`Matricular-se na trilha ${id} (implementar chamada)`);
+  function handleMatricular(trail: Trilha) {
+    navigate(`/trail-details/${trail.id}`);
   }
 
 
@@ -264,7 +264,7 @@ export default function Home() {
                   <div className="track-footer">
                     <button
                       className="track-btn"
-                      onClick={() => handleMatricular(t.id)}
+                    onClick={() => handleMatricular(t)}
                     >
                       {actionLabel}
                     </button>

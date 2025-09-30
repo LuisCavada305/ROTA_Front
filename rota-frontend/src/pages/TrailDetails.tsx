@@ -2,7 +2,7 @@ import Layout from "../components/Layout";
 import "../styles/TrailDetails.css";
 import { http } from "../lib/http";
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { normalizePaginatedPayload, type PaginatedPayload } from "../types/Pagination";
 
 type SectionItem = {
@@ -62,6 +62,9 @@ export default function TrailDetails() {
   const { id } = useParams<{ id: string }>();
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  const [enrolling, setEnrolling] = useState(false);
+  const [enrollError, setEnrollError] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   // "View model" final que a UI consome
   const [vm, setVm] = useState<{
@@ -265,6 +268,93 @@ export default function TrailDetails() {
   }, [id]);
 
   const pct = useMemo(() => vm?.progress?.pct ?? 0, [vm]);
+  const firstItemId = useMemo(() => {
+    if (!vm) return null;
+    for (const section of vm.sections) {
+      if (section.items.length > 0) {
+        return section.items[0].id;
+      }
+    }
+    return null;
+  }, [vm]);
+
+  const primaryActionLabel = useMemo(() => {
+    const status = vm?.progress?.status;
+    if (!status) return "Matricular-se";
+    if (status === "COMPLETED") return "Revisar";
+    if (status === "ENROLLED") return "Continuar";
+    return vm?.progress?.nextAction ?? "Continuar";
+  }, [vm]);
+
+  const handlePrimaryAction = async () => {
+    if (!vm) return;
+    setEnrollError(null);
+    const status = vm.progress.status;
+
+    if (!status) {
+      try {
+        setEnrolling(true);
+        const { data } = await http.post<{
+          ok: boolean;
+          trail_id: number;
+          first_item_id: number | null;
+          progress: {
+            done: number;
+            total: number;
+            computed_progress_percent?: number | null;
+            nextAction?: string | null;
+            enrolledAt?: string | null;
+            status?: string | null;
+            completed_at?: string | null;
+          } | null;
+        }>(`/user-trails/${vm.id}/enroll`);
+
+        if (data.progress) {
+          const progressData = data.progress;
+          const computedPct = typeof progressData.computed_progress_percent === "number"
+            ? Math.round(progressData.computed_progress_percent)
+            : vm.progress.pct;
+
+          setVm((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  progress: {
+                    ...prev.progress,
+                    done: progressData.done ?? prev.progress.done,
+                    total: progressData.total ?? prev.progress.total,
+                    nextAction: progressData.nextAction ?? prev.progress.nextAction,
+                    enrolledAt: progressData.enrolledAt ?? prev.progress.enrolledAt,
+                    status: progressData.status ?? prev.progress.status,
+                    completed_at: progressData.completed_at ?? prev.progress.completed_at,
+                    pct: computedPct ?? prev.progress.pct,
+                  },
+                }
+              : prev
+          );
+        }
+
+        const targetItem = data.first_item_id ?? firstItemId;
+        if (targetItem) {
+          navigate(`/trilha/${vm.id}/aula/${targetItem}`);
+        }
+      } catch (error: any) {
+        const statusCode = error?.response?.status;
+        if (statusCode === 401) {
+          navigate("/login");
+        } else {
+          setEnrollError("Não foi possível realizar a matrícula. Tente novamente.");
+        }
+      } finally {
+        setEnrolling(false);
+      }
+      return;
+    }
+
+    if (firstItemId) {
+      navigate(`/trilha/${vm.id}/aula/${firstItemId}`);
+    }
+  };
 
   if (loading) {
     return (
@@ -399,12 +489,19 @@ export default function TrailDetails() {
                     Concluída em {new Date(vm.progress.completed_at).toLocaleDateString("pt-BR")}
                   </div>
                 )}
-                <Link
-                  to={`/trilha/${vm.id}/aula/${vm.sections[0]?.items[0]?.id ?? ""}`}
+                <button
+                  type="button"
                   className="btn btn-primary btn-block"
+                  onClick={handlePrimaryAction}
+                  disabled={enrolling || (!firstItemId && vm.progress.status !== "ENROLLED")}
                 >
-                  {vm.progress.nextAction ?? "Continuar"}
-                </Link>
+                  {enrolling ? "Processando…" : primaryActionLabel}
+                </button>
+                {enrollError && (
+                  <div className="enroll-error" role="alert">
+                    {enrollError}
+                  </div>
+                )}
                 <ul className="mini-list">
                   <li>Conclua todas as lições para marcar este curso como concluído</li>
                   {vm.nextLessonDate && (

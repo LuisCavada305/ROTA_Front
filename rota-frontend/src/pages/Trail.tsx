@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { http } from "../lib/http";
 import "../styles/Trail.css";
 import Layout from "../components/Layout";
+import { useAuth } from "../hooks/AuthContext";
 
 /** ===== Tipos vindos do seu back ===== */
 type Item = {
@@ -108,16 +109,21 @@ function YouTubePlayer({
   startAt = 0,
   onProgress,
   onReady,
+  maxAllowedPosition,
+  seekBlockedLabel,
 }: {
   videoId: string;
   startAt?: number;
   onProgress?: (t: { current: number; duration: number }) => void;
   onReady?: (t: { current: number; duration: number }) => void;
+  maxAllowedPosition?: number;
+  seekBlockedLabel?: string;
 }) {
   const surfaceRef = useRef<HTMLDivElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const playerRef = useRef<any>(null);
   const timerRef = useRef<number | null>(null);
+  const seekWarnTimerRef = useRef<number | null>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [current, setCurrent] = useState(0);
@@ -125,6 +131,7 @@ function YouTubePlayer({
   const [hover, setHover] = useState(false);
   const [muted, setMuted] = useState(false);
   const [volume, setVolume] = useState(100);
+  const [seekWarning, setSeekWarning] = useState(false);
 
   // velocidade / taxas válidas
   const [speed, setSpeed] = useState(1);
@@ -237,12 +244,16 @@ function YouTubePlayer({
           },
           onStateChange: (e: any) => {
             if (e?.data === 0) {
-              // terminou: evita relateds
-              try { playerRef.current.seekTo(0, true); playerRef.current.pauseVideo(); } catch {}
-                setIsPlaying(false);
-                playerRef.current.seekTo(Math.max(0, duration - 0.25), true);
+              // terminou: pausa próximo do fim, mantém progresso máximo
+              setIsPlaying(false);
+              const safePoint = Math.max(0, (playerRef.current?.getDuration?.() ?? duration) - 0.25);
+              try {
+                playerRef.current.seekTo(safePoint, true);
                 playerRef.current.pauseVideo();
-                playerRef.current.seekTo(0, true);
+              } catch {}
+              setCurrent(playerRef.current?.getDuration?.() ?? duration);
+              const finalDuration = playerRef.current?.getDuration?.() ?? duration;
+              onProgressRef.current?.({ current: finalDuration, duration: finalDuration });
             } else {
               setIsPlaying(e?.data === 1);
             }
@@ -262,11 +273,43 @@ function YouTubePlayer({
     isPlaying ? playerRef.current.pauseVideo() : playerRef.current.playVideo();
   };
 
+  useEffect(() => () => {
+    if (seekWarnTimerRef.current) {
+      clearTimeout(seekWarnTimerRef.current);
+      seekWarnTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!seekBlockedLabel && seekWarnTimerRef.current) {
+      clearTimeout(seekWarnTimerRef.current);
+      seekWarnTimerRef.current = null;
+    }
+    if (!seekBlockedLabel) {
+      setSeekWarning(false);
+    }
+  }, [seekBlockedLabel]);
+
   const handleSeek = (value: number) => {
     if (!playerRef.current) return;
     const t = Math.max(0, Math.min(value, duration || 0));
-    playerRef.current.seekTo(t, true);
-    setCurrent(t);
+    let finalTarget = t;
+    if (typeof maxAllowedPosition === "number" && Number.isFinite(maxAllowedPosition)) {
+      const limit = Math.max(0, Math.min(maxAllowedPosition, duration || maxAllowedPosition));
+      if (finalTarget > limit) {
+        finalTarget = limit;
+        if (seekBlockedLabel) {
+          setSeekWarning(true);
+          if (seekWarnTimerRef.current) clearTimeout(seekWarnTimerRef.current);
+          seekWarnTimerRef.current = window.setTimeout(() => {
+            setSeekWarning(false);
+            seekWarnTimerRef.current = null;
+          }, 2500);
+        }
+      }
+    }
+    playerRef.current.seekTo(finalTarget, true);
+    setCurrent(finalTarget);
   };
 
   const toggleMute = () => {
@@ -377,6 +420,7 @@ function YouTubePlayer({
               background: `linear-gradient(to right, rgba(255,255,255,0.95) ${pct}%, rgba(255,255,255,0.25) ${pct}%)`
             }}
             aria-label="Progresso"
+            title={seekBlockedLabel && typeof maxAllowedPosition === "number" ? seekBlockedLabel : undefined}
           />
 
           {/* tempo restante */}
@@ -413,6 +457,11 @@ function YouTubePlayer({
           <button className="cp-btn cp-full" onClick={toggleFullscreen} aria-label={isFs ? "Sair de tela cheia" : "Tela cheia"}>
             {isFs ? "🡽" : "⛶"}
           </button>
+          {seekWarning && seekBlockedLabel && (
+            <div className="cp-warning" role="status">
+              {seekBlockedLabel}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -423,11 +472,13 @@ function YouTubePlayer({
 export default function Trail() {
   const { trailId, itemId } = useParams<{ trailId: string; itemId: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [sections, setSections] = useState<Section[]>([]);
   const [progress, setProgress] = useState<ProgressTotal | null>(null);
   const [detail, setDetail] = useState<ItemDetail | null>(null);
   const [watch, setWatch] = useState({ current: 0, duration: 0 });
+  const [maxWatched, setMaxWatched] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [itemProgress, setItemProgress] = useState<Record<number, ItemProgress>>({});
@@ -440,6 +491,8 @@ export default function Trail() {
 
   // quais sections estão abertas (expandidas)
   const [openSections, setOpenSections] = useState<Set<number>>(new Set());
+
+  const isPrivileged = user?.role === "Admin" || user?.role === "Manager";
 
   const loadProgress = useCallback(async () => {
     if (!trailId) return;
@@ -507,15 +560,47 @@ export default function Trail() {
     return "tutor-icon-brand-youtube-bold";
   }
 
+  const totalDuration = watch.duration || (detail?.duration_seconds ?? 0);
+
   // % assistido (local; o back guarda progress_value)
+  const watchedSeconds = useMemo(() => {
+    if (detail?.type !== "VIDEO") return watch.current;
+    const candidate = Math.max(maxWatched, watch.current);
+    if (!totalDuration) return candidate;
+    return Math.min(candidate, totalDuration);
+  }, [detail?.type, maxWatched, watch.current, totalDuration]);
+
   const pct = useMemo(
-    () => (watch.duration ? Math.min(100, (watch.current / watch.duration) * 100) : 0),
-    [watch]
+    () => (totalDuration ? Math.min(100, (watchedSeconds / totalDuration) * 100) : 0),
+    [watchedSeconds, totalDuration]
   );
+
   const canComplete = useMemo(
-    () => detail?.type === "VIDEO" && pct >= (detail.required_percentage ?? 70),
-    [detail, pct]
+    () => detail?.type === "VIDEO" && totalDuration > 0 && pct >= (detail.required_percentage ?? 70),
+    [detail, pct, totalDuration]
   );
+
+  const seekForwardGrace = 1.5;
+  const maxSeekPosition = useMemo(() => {
+    if (isPrivileged) return undefined;
+    const limit = Math.max(maxWatched + seekForwardGrace, watchedSeconds);
+    return totalDuration ? Math.min(limit, totalDuration) : limit;
+  }, [isPrivileged, maxWatched, watchedSeconds, totalDuration]);
+
+  const seekBlockedLabel = isPrivileged
+    ? undefined
+    : "Assista sequencialmente para liberar o restante do vídeo.";
+
+  useEffect(() => {
+    if (!detail || detail.type !== "VIDEO") return;
+    const progressEntry = itemProgress[detail.id];
+    if (!progressEntry) return;
+    const stored = progressEntry.progress_value ?? 0;
+    if (stored <= 0) return;
+    setMaxWatched((prev) => (stored > prev ? stored : prev));
+  }, [detail, itemProgress]);
+
+  const showManualCompletion = detail?.type === "DOC";
 
   const questionOrderMap = useMemo(() => {
     if (!detail?.form) return new Map<number, number>();
@@ -638,6 +723,7 @@ export default function Trail() {
         const detailData = detRes.data as ItemDetail;
         setDetail(detailData);
 
+        setMaxWatched(0);
         if (detailData.type === "VIDEO") {
           setWatch({
             current: 0,
@@ -669,7 +755,7 @@ export default function Trail() {
         setSaving(true);
         await http.put(`/trails/${trailId}/items/${detail.id}/progress`, {
           status: canComplete ? "COMPLETED" : "IN_PROGRESS",
-          progress_value: Math.floor(watch.current), // segundos
+          progress_value: Math.floor(watchedSeconds), // segundos assistidos
         });
         await loadProgress();
       } catch {} finally {
@@ -677,7 +763,7 @@ export default function Trail() {
       }
     }, 5000);
     return () => clearTimeout(id);
-  }, [watch.current, canComplete, trailId, detail, loadProgress]);
+  }, [watchedSeconds, canComplete, trailId, detail, loadProgress]);
 
   if (loading || !detail || !progress) {
     return <div className="lesson-page loading">Carregando…</div>;
@@ -778,22 +864,26 @@ export default function Trail() {
           )}
 
           {detail.type === "VIDEO" && (
+            <span className="video-auto-note">O vídeo é concluído automaticamente ao atingir a porcentagem mínima.</span>
+          )}
+
+          {showManualCompletion && (
             <button
               className="btn btn-primary mark-complete"
-              disabled={!canComplete || saving || progress.status === "COMPLETED"}
+              disabled={saving || progress.status === "COMPLETED"}
               onClick={async () => {
                 try {
                   setSaving(true);
-                  await http.put(`/trails/${trailId}/items/${detail.id}/progress`, {
-                    status: "COMPLETED",
-                    progress_value: Math.floor(watch.current),
-                  });
+              await http.put(`/trails/${trailId}/items/${detail.id}/progress`, {
+                status: "COMPLETED",
+                progress_value: detail.type === "VIDEO" ? Math.floor(watchedSeconds) : null,
+              });
                   await loadProgress();
                 } finally {
                   setSaving(false);
                 }
               }}
-              title={canComplete ? "Marcar como concluído" : `Assista pelo menos ${detail.required_percentage ?? 70}%`}
+              title="Marcar como concluído"
             >
               {saving ? "Salvando…" : "Marcar como concluído"}
             </button>
@@ -809,9 +899,22 @@ export default function Trail() {
             <YouTubePlayer
               videoId={detail.youtubeId}
               startAt={0}
-              onReady={({ current, duration }) => setWatch({ current, duration })}
-              onProgress={({ current, duration }) => setWatch({ current, duration })}
+              onReady={({ current, duration }) => {
+                setWatch({ current, duration });
+                setMaxWatched(Math.max(0, current));
+              }}
+              onProgress={({ current, duration }) => {
+                setWatch({ current, duration });
+                setMaxWatched((prev) => Math.max(prev, current));
+              }}
+              maxAllowedPosition={maxSeekPosition}
+              seekBlockedLabel={seekBlockedLabel}
             />
+            {!isPrivileged && (
+              <p className="video-note">
+                Você pode arrastar a linha do tempo apenas até o ponto já assistido.
+              </p>
+            )}
           </div>
         ) : detail.type === "FORM" && detail.form ? (
           <div className="form-wrapper">

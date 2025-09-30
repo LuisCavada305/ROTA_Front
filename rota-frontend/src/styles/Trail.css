@@ -398,6 +398,26 @@
   width: 14px; height: 14px; border-radius: 999px; background: #fff; border: 0;
 }
 
+.cp-warning {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.85);
+  text-align: center;
+  margin-top: 4px;
+}
+
+.video-note {
+  font-size: 12px;
+  color: #6b7280;
+  margin: 8px 0 0;
+  padding: 0 4px;
+}
+
+.video-auto-note {
+  font-size: 12px;
+  color: #4b5563;
+}
+
 /* base */
 .custom-player { width: 100%; }
 .player-surface { background: #000; border-radius: 12px; overflow: hidden; position: relative; }

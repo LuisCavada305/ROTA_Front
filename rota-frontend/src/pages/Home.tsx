@@ -18,6 +18,17 @@ import { Navigation, Pagination, Autoplay } from "swiper/modules";
 import { http } from "../lib/http";
 import type { Trilha } from "../types/Trilha";
 
+function formatTrailStatus(status?: string | null, isCompleted?: boolean | null) {
+  if (isCompleted) return "Concluída";
+  if (!status) return "";
+  const map: Record<string, string> = {
+    COMPLETED: "Concluída",
+    IN_PROGRESS: "Em andamento",
+    ENROLLED: "Inscrito",
+  };
+  return map[status] ?? status;
+}
+
 export default function Home() {
   const [trilhas, setTrilhas] = useState<Trilha[]>([]);
   const [loadingTrilhas, setLoadingTrilhas] = useState(true);
@@ -44,7 +55,7 @@ export default function Home() {
     })();
   }, []);
 
-  function handleMatricular(id: string) {
+  function handleMatricular(id: number) {
     // aqui você chama sua rota de matrícula (ex.: POST /matriculas { trilhaId })
     // http.post("/matriculas", { trilhaId: id });
     alert(`Matricular-se na trilha ${id} (implementar chamada)`);
@@ -207,8 +218,17 @@ export default function Home() {
 
           {!loadingTrilhas && !erroTrilhas && (
             <div className="tracks-grid">
-              {trilhas.map((t) => (
-                <article key={t.id} className="track-card">
+              {trilhas.map((t) => {
+                const progressPercent = typeof t.progress_percent === "number"
+                  ? Math.round(t.progress_percent)
+                  : null;
+                const statusLabel = formatTrailStatus(t.status, t.is_completed);
+                const actionLabel = t.is_completed
+                  ? "Revisar"
+                  : t.nextAction ?? t.botaoLabel ?? "Continuar";
+
+                return (
+                <article key={t.id} className={`track-card ${t.is_completed ? "is-completed" : ""}`}>
                   <div className="track-cover">
                     <img src={t.thumbnail_url} alt={t.name} loading="lazy" />
                   </div>
@@ -226,6 +246,19 @@ export default function Home() {
                     </div>
 
                     <h3 className="track-title">{t.name}</h3>
+                    {statusLabel && (
+                      <span className={`track-status-badge status-${(t.status ?? "").toLowerCase()}`}>
+                        {statusLabel}
+                      </span>
+                    )}
+                    {progressPercent !== null && (
+                      <div className="track-progress">
+                        <div className="track-progress-bar">
+                          <span style={{ width: `${progressPercent}%` }} />
+                        </div>
+                        <span className="track-progress-label">{progressPercent}%</span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="track-footer">
@@ -233,11 +266,12 @@ export default function Home() {
                       className="track-btn"
                       onClick={() => handleMatricular(t.id)}
                     >
-                      {t.botaoLabel ?? "Matricular-se no Curso"}
+                      {actionLabel}
                     </button>
                   </div>
                 </article>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

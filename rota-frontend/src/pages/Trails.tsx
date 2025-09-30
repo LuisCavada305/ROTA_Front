@@ -3,7 +3,18 @@ import '../styles/Home.css';
 import type { Trilha } from "../types/Trilha";
 import { http } from "../lib/http";
 import Layout from '../components/Layout';
-import { Link } from 'lucide-react';
+import type { PaginationMeta } from "../types/Pagination";
+
+function formatTrailStatus(status?: string | null, isCompleted?: boolean | null) {
+  if (isCompleted) return "Concluída";
+  if (!status) return "";
+  const map: Record<string, string> = {
+    COMPLETED: "Concluída",
+    IN_PROGRESS: "Em andamento",
+    ENROLLED: "Inscrito",
+  };
+  return map[status] ?? status;
+}
 
 const PAGE_SIZE = 8;
 
@@ -12,37 +23,61 @@ export default function Trails() {
   const [loadingTrilhas, setLoadingTrilhas] = useState(true);
   const [erroTrilhas, setErroTrilhas] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState<PaginationMeta | null>(null);
 
-  async function getTrilhas() {
-    // espera que o back responda { trails: Trilha[] }
-    const response = await http.get("/trails/");
-    return response.data.trails as Trilha[];
-  }
-
-  function handleMatricular(id: string) {
+  function handleMatricular(id: number) {
     // http.post("/matriculas", { trilhaId: id });
     alert(`Matricular-se na trilha ${id} (implementar chamada)`);
   }
 
   useEffect(() => {
+    let cancelled = false;
+
+    async function getTrilhas(currentPage: number) {
+      const response = await http.get("/trails/", {
+        params: {
+          page: currentPage,
+          page_size: PAGE_SIZE,
+        },
+      });
+      const { trails = [], pagination: meta } = response.data as {
+        trails?: Trilha[];
+        pagination?: PaginationMeta | null;
+      };
+      return { trails, pagination: meta ?? null };
+    }
+
     (async () => {
       try {
         setLoadingTrilhas(true);
-        const data = await getTrilhas();
+        const { trails: data, pagination: meta } = await getTrilhas(page);
+        if (cancelled) return;
         setTrilhas(data ?? []);
+        setPagination(meta);
         setErroTrilhas(null);
-        setPage(1); // volta para a primeira página ao carregar/atualizar
       } catch (e: any) {
+        if (cancelled) return;
         setErroTrilhas(e?.detail || "Erro ao buscar trilhas.");
       } finally {
+        if (cancelled) return;
         setLoadingTrilhas(false);
       }
     })();
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [page]);
+
+  useEffect(() => {
+    if (!pagination) return;
+    if (pagination.pages > 0 && page > pagination.pages) {
+      setPage(pagination.pages);
+    }
+  }, [pagination, page]);
 
   const totalPages = useMemo(
-    () => Math.max(1, Math.ceil(trilhas.length / PAGE_SIZE)),
-    [trilhas.length]
+    () => Math.max(1, pagination?.pages ?? 1),
+    [pagination?.pages]
   );
 
   // Garante que a página atual sempre seja válida se a lista mudar
@@ -51,11 +86,6 @@ export default function Trails() {
       setPage(totalPages);
     }
   }, [page, totalPages]);
-
-  const pageItems = useMemo(() => {
-    const start = (page - 1) * PAGE_SIZE;
-    return trilhas.slice(start, start + PAGE_SIZE);
-  }, [trilhas, page]);
 
   function goToPage(p: number) {
     const bounded = Math.min(Math.max(1, p), totalPages);
@@ -105,8 +135,17 @@ export default function Trails() {
       {!loadingTrilhas && !erroTrilhas && trilhas.length > 0 && (
         <>
           <div className="tracks-grid" style={{ paddingTop: 50 }}>
-            {pageItems.map((t) => (
-              <article key={t.id} className="track-card">
+            {trilhas.map((t) => {
+              const progressPercent = typeof t.progress_percent === "number"
+                ? Math.round(t.progress_percent)
+                : null;
+              const statusLabel = formatTrailStatus(t.status, t.is_completed);
+              const actionLabel = t.is_completed
+                ? "Revisar"
+                : t.nextAction ?? t.botaoLabel ?? "Continuar";
+
+              return (
+              <article key={t.id} className={`track-card ${t.is_completed ? "is-completed" : ""}`}>
               <div className="track-cover">
                 <a href={`/trail-details/${t.id}`}>
                   <img src={t.thumbnail_url} alt={t.name} loading="lazy" />
@@ -125,6 +164,19 @@ export default function Trails() {
                   </div>
 
                   <h3 className="track-title">{t.name}</h3>
+                  {statusLabel && (
+                    <span className={`track-status-badge status-${(t.status ?? "").toLowerCase()}`}>
+                      {statusLabel}
+                    </span>
+                  )}
+                  {progressPercent !== null && (
+                    <div className="track-progress">
+                      <div className="track-progress-bar">
+                        <span style={{ width: `${progressPercent}%` }} />
+                      </div>
+                      <span className="track-progress-label">{progressPercent}%</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="track-footer">
@@ -132,11 +184,12 @@ export default function Trails() {
                     className="track-btn"
                     onClick={() => handleMatricular(t.id)}
                   >
-                    {t.botaoLabel ?? "Matricular-se no Curso"}
+                    {actionLabel}
                   </button>
                 </div>
               </article>
-            ))}
+              );
+            })}
           </div>
 
           {/* Controles de paginação */}

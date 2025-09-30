@@ -3,6 +3,7 @@ import "../styles/TrailDetails.css";
 import { http } from "../lib/http";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { normalizePaginatedPayload, type PaginatedPayload } from "../types/Pagination";
 
 type SectionItem = {
   id: number;
@@ -16,6 +17,8 @@ type Section = {
   order_index?: number;
   items: SectionItem[];
 };
+
+type SectionSummary = Omit<Section, "items">;
 
 type TrailCore = {
   id: number;
@@ -34,6 +37,8 @@ type Progress = {
   nextAction?: string;
   enrolledAt?: string; // ISO
   pct?: number;        // calculado/fallback
+  status?: string | null;
+  completed_at?: string | null;
 };
 
 function secondsToMMSS(total?: number | null) {
@@ -41,6 +46,16 @@ function secondsToMMSS(total?: number | null) {
   const m = Math.floor(total / 60);
   const s = total % 60;
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+function formatStatusLabel(status?: string | null) {
+  if (!status) return "";
+  const map: Record<string, string> = {
+    COMPLETED: "Concluída",
+    IN_PROGRESS: "Em andamento",
+    ENROLLED: "Inscrito",
+  };
+  return map[status] ?? status;
 }
 
 export default function TrailDetails() {
@@ -81,16 +96,51 @@ export default function TrailDetails() {
           .get<Section[]>(`/trails/${id}/sections-with-items`)
           .then(r => r.data)
           .catch(async () => {
-            // fallback: busca só sections e, em seguida, items por seção
-            const secs = await http.get<Omit<Section, "items">[]>(`/trails/${id}/sections`).then(r => r.data);
+            const sections: SectionSummary[] = [];
+            const sectionPageSize = 50;
+
+            let secPage = 1;
+            // fallback: busca sections paginadas e, em seguida, items por seção
+            while (true) {
+              const response = await http.get(`/trails/${id}/sections`, {
+                params: { page: secPage, page_size: sectionPageSize },
+              });
+              const { data: chunk, pagination } = normalizePaginatedPayload<"sections", SectionSummary>(
+                response.data as PaginatedPayload<"sections", SectionSummary>,
+                "sections"
+              );
+              sections.push(...chunk);
+              if (!pagination || pagination.pages === 0 || secPage >= pagination.pages) {
+                break;
+              }
+              secPage += 1;
+            }
+
             const itemsBySec = await Promise.all(
-              secs.map(sec =>
-                http
-                  .get<SectionItem[]>(`/trails/${id}/sections/${sec.id}/items`)
-                  .then(r => ({ ...sec, items: r.data }))
-                  .catch(() => ({ ...sec, items: [] }))
-              )
+              sections.map(async (sec) => {
+                const items: SectionItem[] = [];
+                const itemPageSize = 50;
+                let itemPage = 1;
+
+                while (true) {
+                  const response = await http.get(`/trails/${id}/sections/${sec.id}/items`, {
+                    params: { page: itemPage, page_size: itemPageSize },
+                  });
+                  const { data: chunk, pagination } = normalizePaginatedPayload<"items", SectionItem>(
+                    response.data as PaginatedPayload<"items", SectionItem>,
+                    "items"
+                  );
+                  items.push(...chunk);
+                  if (!pagination || pagination.pages === 0 || itemPage >= pagination.pages) {
+                    break;
+                  }
+                  itemPage += 1;
+                }
+
+                return { ...sec, items };
+              })
             );
+
             return itemsBySec;
           });
 
@@ -176,6 +226,8 @@ export default function TrailDetails() {
           nextAction: progressRaw?.nextAction || (done > 0 ? "Continue a Estudar" : "Começar"),
           enrolledAt: progressRaw?.enrolledAt || progressRaw?.started_at,
           pct: pctFromBack ?? pctCalc,
+          status: progressRaw?.status ?? null,
+          completed_at: progressRaw?.completed_at ?? null,
         };
 
         const nextLessonDate = progress.enrolledAt
@@ -337,6 +389,16 @@ export default function TrailDetails() {
                     <span style={{ width: `${pct}%` }} />
                   </div>
                 </div>
+                {vm.progress.status && (
+                  <div className={`progress-status status-${vm.progress.status.toLowerCase()}`}>
+                    {formatStatusLabel(vm.progress.status)}
+                  </div>
+                )}
+                {vm.progress.completed_at && (
+                  <div className="progress-meta">
+                    Concluída em {new Date(vm.progress.completed_at).toLocaleDateString("pt-BR")}
+                  </div>
+                )}
                 <Link
                   to={`/trilha/${vm.id}/aula/${vm.sections[0]?.items[0]?.id ?? ""}`}
                   className="btn btn-primary btn-block"

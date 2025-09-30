@@ -1,5 +1,5 @@
 export type Trilha = {
-  id: string;
+  id: number;
   name: string;
   thumbnail_url: string;
   author?: string;
@@ -8,4 +8,9 @@ export type Trilha = {
   requirements?: string[];  
   targetAudience?: string[]; 
   includedItems?: string[];
+  progress_percent?: number;
+  status?: string;
+  completed_at?: string;
+  is_completed?: boolean;
+  nextAction?: string;
 };

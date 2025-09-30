@@ -154,6 +154,23 @@
 
 .progress-count{ font-weight: 800; font-size: .95rem; }
 .progress-label{ font-size: .88rem; color: var(--muted); }
+.progress-status {
+  margin-top: 6px;
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: .78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  background: #e0f2fe;
+  color: #0369a1;
+}
+.progress-status.status-completed { background: #dcfce7; color: #047857; }
+.progress-status.status-in_progress { background: #fef9c3; color: #b45309; }
+.progress-status.status-enrolled { background: #e0f2fe; color: #0369a1; }
+.progress-meta { margin-top: 6px; font-size: .85rem; color: var(--muted); }
 
 /* Botões menores, como no original */
 .btn{ height: 34px; padding: 0 12px; border-radius: 10px; font-weight: 600; }

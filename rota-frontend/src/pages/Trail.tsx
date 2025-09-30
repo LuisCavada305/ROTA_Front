@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { http } from "../lib/http";
 import "../styles/Trail.css";
@@ -26,20 +26,81 @@ type ProgressTotal = {
   computed_progress_percent?: number | null;
   nextAction?: string | null;
   enrolledAt?: string | null;
+  status?: string | null;
+  completed_at?: string | null;
+};
+
+type ItemType = "VIDEO" | "DOC" | "FORM";
+
+type FormOption = {
+  id: number;
+  text: string;
+  order_index: number;
+};
+
+type FormQuestion = {
+  id: number;
+  prompt: string;
+  type: "ESSAY" | "TRUE_OR_FALSE" | "SINGLE_CHOICE" | "UNKNOWN";
+  required: boolean;
+  order_index: number;
+  points: number;
+  options: FormOption[];
+};
+
+type FormSchema = {
+  id: number;
+  title?: string | null;
+  description?: string | null;
+  min_score_to_pass: number;
+  randomize_questions?: boolean | null;
+  questions: FormQuestion[];
 };
 
 /** ===== Detalhe de item (novo GET no back) ===== */
 type ItemDetail = {
   id: number;
   trail_id: number;
-  section_id: number;
+  section_id: number | null;
   title: string;
-  youtubeId: string;           // só o ID (ex.: "T7BCv5BKrls")
-  duration_seconds: number;    // 572 no exemplo
-  required_percentage: number; // default 70
-  description_html: string;    // "Sobre a Aula..." em HTML
+  type: ItemType;
+  youtubeId?: string;
+  duration_seconds?: number | null;
+  required_percentage?: number | null;
+  description_html: string;
   prev_item_id?: number | null;
   next_item_id?: number | null;
+  form?: FormSchema | null;
+};
+
+type FormResult = {
+  submission_id: number;
+  score: number;
+  score_points: number;
+  max_points: number;
+  max_score: number;
+  passed: boolean | null;
+  requires_manual_review: boolean;
+  answers: {
+    question_id: number;
+    is_correct: boolean | null;
+    points_awarded: number | null;
+  }[];
+};
+
+type ItemProgress = {
+  item_id: number;
+  status?: string | null;
+  progress_value?: number | null;
+  completed_at?: string | null;
+};
+
+type SectionProgress = {
+  section_id: number;
+  title: string;
+  total: number;
+  done: number;
+  percent: number;
 };
 
 function YouTubePlayer({
@@ -279,6 +340,7 @@ function YouTubePlayer({
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       onMouseMove={() => setHover(true)}
+      onContextMenu={(e) => e.preventDefault()}
     >
       <div
         ref={surfaceRef}
@@ -368,31 +430,82 @@ export default function Trail() {
   const [watch, setWatch] = useState({ current: 0, duration: 0 });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-// quais sections estão abertas (expandidas)
-const [openSections, setOpenSections] = useState<Set<number>>(new Set());
+  const [itemProgress, setItemProgress] = useState<Record<number, ItemProgress>>({});
+  const [sectionProgress, setSectionProgress] = useState<Record<number, SectionProgress>>({});
+  const sectionsRef = useRef<Section[]>([]);
+  const [formAnswers, setFormAnswers] = useState<Record<number, { selectedOptionId?: number; answerText?: string }>>({});
+  const [formSubmitting, setFormSubmitting] = useState(false);
+  const [formResult, setFormResult] = useState<FormResult | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
-// abre a seção da aula atual ao carregar/trocar de item
-useEffect(() => {
-  const secWithCurrent = sections.find((s) =>
-    s.items.some((i) => String(i.id) === itemId)
-  )?.id;
-  if (secWithCurrent) {
+  // quais sections estão abertas (expandidas)
+  const [openSections, setOpenSections] = useState<Set<number>>(new Set());
+
+  const loadProgress = useCallback(async () => {
+    if (!trailId) return;
+    try {
+      const [trailRes, itemsRes, sectionsRes] = await Promise.all([
+        http.get<ProgressTotal>(`/user-trails/${trailId}/progress`),
+        http.get<ItemProgress[]>(`/user-trails/${trailId}/items-progress`),
+        http.get<SectionProgress[]>(`/user-trails/${trailId}/sections-progress`),
+      ]);
+
+      setProgress(trailRes.data ?? null);
+
+      const itemEntries = (itemsRes.data ?? []).map((ip) => [ip.item_id, ip] as const);
+      setItemProgress(Object.fromEntries(itemEntries));
+
+      const sectionEntries = (sectionsRes.data ?? []).map((sp) => [sp.section_id, sp] as const);
+      setSectionProgress(Object.fromEntries(sectionEntries));
+    } catch (error) {
+      const status = (error as any)?.response?.status;
+      if (status === 401) {
+        const fallbackTotal = sectionsRef.current.reduce((acc, sec) => acc + (sec.items?.length ?? 0), 0);
+        setProgress({ done: 0, total: fallbackTotal, computed_progress_percent: 0, nextAction: "Começar" });
+        setItemProgress({});
+        setSectionProgress({});
+        return;
+      }
+      // eslint-disable-next-line no-console
+      console.error("Falha ao carregar progresso da trilha", error);
+      setProgress((prev) => prev ?? {
+        done: 0,
+        total: sectionsRef.current.reduce((acc, sec) => acc + (sec.items?.length ?? 0), 0),
+        computed_progress_percent: 0,
+        nextAction: "Começar",
+      });
+    }
+  }, [trailId]);
+
+  // abre a seção da aula atual ao carregar/trocar de item
+  useEffect(() => {
+    const secWithCurrent = sections.find((s) =>
+      s.items.some((i) => String(i.id) === itemId)
+    )?.id;
+    if (secWithCurrent) {
+      setOpenSections((prev) => {
+        const next = new Set(prev);
+        next.add(secWithCurrent);
+        return next;
+      });
+    }
+  }, [sections, itemId]);
+
+  function toggleSection(id: number) {
     setOpenSections((prev) => {
       const next = new Set(prev);
-      next.add(secWithCurrent);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   }
-}, [sections, itemId]);
 
-function toggleSection(id: number) {
-  setOpenSections((prev) => {
-    const next = new Set(prev);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    return next;
-  });
-}
+  function resolveIconClass(type?: string | null) {
+    if (type === "QUIZ") return "tutor-icon-quiz-o";
+    if (type === "PDF" || type === "DOC") return "tutor-icon-document-text";
+    if (type === "FORM") return "tutor-icon-edit";
+    return "tutor-icon-brand-youtube-bold";
+  }
 
   // % assistido (local; o back guarda progress_value)
   const pct = useMemo(
@@ -400,32 +513,145 @@ function toggleSection(id: number) {
     [watch]
   );
   const canComplete = useMemo(
-    () => !!detail && pct >= (detail.required_percentage ?? 70),
+    () => detail?.type === "VIDEO" && pct >= (detail.required_percentage ?? 70),
     [detail, pct]
   );
+
+  const questionOrderMap = useMemo(() => {
+    if (!detail?.form) return new Map<number, number>();
+    return new Map(detail.form.questions.map((q, index) => [q.id, index + 1]));
+  }, [detail?.form]);
+
+  const questionResultMap = useMemo(() => {
+    if (!formResult) return new Map<number, FormResult["answers"][number]>();
+    return new Map(formResult.answers.map((ans) => [ans.question_id, ans]));
+  }, [formResult]);
+
+  const handleOptionChange = (questionId: number, optionId: number) => {
+    setFormAnswers((prev) => ({
+      ...prev,
+      [questionId]: { ...(prev[questionId] ?? {}), selectedOptionId: optionId },
+    }));
+    setFormError(null);
+    setFormResult(null);
+  };
+
+  const handleEssayChange = (questionId: number, value: string) => {
+    setFormAnswers((prev) => ({
+      ...prev,
+      [questionId]: { ...(prev[questionId] ?? {}), answerText: value },
+    }));
+    setFormError(null);
+    setFormResult(null);
+  };
+
+  const submitFormAnswers = async () => {
+    if (!detail || detail.type !== "FORM" || !detail.form) return;
+
+    const missingRequired: number[] = [];
+    const answersPayload: { question_id: number; selected_option_id?: number; answer_text?: string }[] = [];
+
+    for (const question of detail.form.questions) {
+      const stored = formAnswers[question.id];
+      if (question.type === "ESSAY") {
+        const text = stored?.answerText?.trim() ?? "";
+        if (question.required && !text) {
+          missingRequired.push(question.id);
+          continue;
+        }
+        if (text) {
+          answersPayload.push({ question_id: question.id, answer_text: text });
+        }
+      } else {
+        const optionId = stored?.selectedOptionId;
+        if (question.required && optionId == null) {
+          missingRequired.push(question.id);
+          continue;
+        }
+        if (optionId != null) {
+          answersPayload.push({
+            question_id: question.id,
+            selected_option_id: optionId,
+          });
+        }
+      }
+    }
+
+    if (missingRequired.length > 0) {
+      const labels = missingRequired
+        .map((id) => questionOrderMap.get(id) ?? id)
+        .join(", ");
+      setFormError(`Responda as questões obrigatórias (${labels}).`);
+      return;
+    }
+
+    setFormError(null);
+    setFormSubmitting(true);
+    try {
+      const response = await http.post<FormResult>(
+        `/trails/${trailId}/items/${detail.id}/form-submissions`,
+        { answers: answersPayload }
+      );
+      setFormResult(response.data);
+      await loadProgress();
+    } catch (error: any) {
+      const status = error?.response?.status;
+      const data = error?.response?.data;
+      if (status === 422) {
+        if (Array.isArray(data?.missing_questions) && data.missing_questions.length) {
+          const labels = (data.missing_questions as number[])
+            .map((id: number) => questionOrderMap.get(id) ?? id)
+            .join(", ");
+          setFormError(`Responda todas as questões obrigatórias (${labels}).`);
+        } else if (Array.isArray(data?.invalid_questions) && data.invalid_questions.length) {
+          setFormError("Uma ou mais respostas são inválidas para este formulário.");
+        } else if (typeof data?.detail === "string") {
+          setFormError(data.detail);
+        } else {
+          setFormError("Não foi possível validar suas respostas. Verifique e tente novamente.");
+        }
+      } else {
+        setFormError("Não foi possível enviar suas respostas. Tente novamente.");
+      }
+    } finally {
+      setFormSubmitting(false);
+    }
+  };
 
   // carrega sidebar + progresso + detalhe atual
   useEffect(() => {
     let mounted = true;
     (async () => {
+      if (!trailId || !itemId) return;
       try {
         setLoading(true);
-        const [secsRes, progRes, detRes] = await Promise.all([
+        const [secsRes, detRes] = await Promise.all([
           http.get<Section[]>(`/trails/${trailId}/sections-with-items`),
-          http.get<ProgressTotal>(`/user-trails/${trailId}/progress`),
           http.get<ItemDetail>(`/trails/${trailId}/items/${itemId}`),
         ]);
 
         if (!mounted) return;
 
+        sectionsRef.current = secsRes.data;
         setSections(secsRes.data);
-        setProgress(progRes.data);
-        setDetail(detRes.data);
 
-        setWatch({
-          current: 0,
-          duration: detRes.data.duration_seconds || 0,
-        });
+        const detailData = detRes.data as ItemDetail;
+        setDetail(detailData);
+
+        if (detailData.type === "VIDEO") {
+          setWatch({
+            current: 0,
+            duration: detailData.duration_seconds ?? 0,
+          });
+        } else {
+          setWatch({ current: 0, duration: 0 });
+        }
+
+        setFormAnswers({});
+        setFormResult(null);
+        setFormError(null);
+
+        await loadProgress();
       } finally {
         if (mounted) setLoading(false);
       }
@@ -433,11 +659,11 @@ function toggleSection(id: number) {
     return () => {
       mounted = false;
     };
-  }, [trailId, itemId]);
+  }, [trailId, itemId, loadProgress]);
 
   // salva progresso a cada 5s (PUT)
   useEffect(() => {
-    if (!detail) return;
+    if (!detail || detail.type !== "VIDEO") return;
     const id = window.setTimeout(async () => {
       try {
         setSaving(true);
@@ -445,12 +671,13 @@ function toggleSection(id: number) {
           status: canComplete ? "COMPLETED" : "IN_PROGRESS",
           progress_value: Math.floor(watch.current), // segundos
         });
+        await loadProgress();
       } catch {} finally {
         setSaving(false);
       }
     }, 5000);
     return () => clearTimeout(id);
-  }, [watch.current, canComplete, trailId, detail]);
+  }, [watch.current, canComplete, trailId, detail, loadProgress]);
 
   if (loading || !detail || !progress) {
     return <div className="lesson-page loading">Carregando…</div>;
@@ -468,6 +695,12 @@ function toggleSection(id: number) {
 {sections.map((s) => {
   const isActive = s.items.some((i) => String(i.id) === itemId);
   const isOpen = openSections.has(s.id);
+  const secProg = sectionProgress[s.id];
+  const sectionSummary = secProg
+    ? `${secProg.done}/${secProg.total} concluídos`
+    : s.items.filter(i => i.type === "VIDEO").length
+      ? `${s.items.filter(i => i.type === "VIDEO").length} vídeos`
+      : `${s.items.length} itens`;
 
   return (
     <div key={s.id} className={`topic ${isActive ? "is-active" : ""}`}>
@@ -482,9 +715,7 @@ function toggleSection(id: number) {
           {s.title}
         </div>
         <div className="topic-summary">
-          {s.items.filter(i => i.type === "VIDEO").length
-            ? `${s.items.filter(i => i.type === "VIDEO").length} vídeos`
-            : `${s.items.length} itens`}
+          {sectionSummary}
         </div>
         <span className={`topic-caret ${isOpen ? "open" : ""}`} aria-hidden="true">▾</span>
       </button>
@@ -493,23 +724,29 @@ function toggleSection(id: number) {
         id={`topic-body-${s.id}`}
         className={`topic-body ${isOpen ? "open" : ""}`}
       >
-        {s.items.map((i) => (
-          <Link
-            key={i.id}
-            to={`/trilha/${trailId}/aula/${i.id}`}
-            className={`topic-item ${String(i.id) === itemId ? "is-active" : ""}`}
-          >
-            <div className="left">
-              <span className={`item-icon ${i.type === "QUIZ" ? "tutor-icon-quiz-o" : i.type === "PDF" ? "tutor-icon-document-text" : "tutor-icon-brand-youtube-bold"}`} />
-              <span className="item-title">{i.title}</span>
-            </div>
-            <div className="right">
-              {typeof i.duration_seconds === "number" && i.type !== "QUIZ" && (
-                <span className="item-duration">{fmtDuration(i.duration_seconds)}</span>
-              )}
-            </div>
-          </Link>
-        ))}
+        {s.items.map((i) => {
+          const progressInfo = itemProgress[i.id];
+          const isDone = progressInfo?.status === "COMPLETED";
+          const isCurrent = String(i.id) === itemId;
+          return (
+            <Link
+              key={i.id}
+              to={`/trilha/${trailId}/aula/${i.id}`}
+              className={`topic-item ${isCurrent ? "is-active" : ""} ${isDone ? "is-done" : ""}`}
+            >
+              <div className="left">
+                <span className={`item-icon ${resolveIconClass(i.type)}`} />
+                <span className="item-title">{i.title}</span>
+              </div>
+              <div className="right">
+                {typeof i.duration_seconds === "number" && i.type !== "QUIZ" && (
+                  <span className="item-duration">{fmtDuration(i.duration_seconds)}</span>
+                )}
+                {isDone && <span className="item-status" aria-label="Item concluído">✓</span>}
+              </div>
+            </Link>
+          );
+        })}
       </div>
     </div>
   );
@@ -520,7 +757,7 @@ function toggleSection(id: number) {
       {/* Main */}
       <main className="lesson-main">
         <div className="topbar">
-          <div className="crumb-title">Trilha de Sustentabilidade</div>
+          <div className="crumb-title">{detail.title}</div>
 
           <div className="progress-wrap">
             <span className="muted">Seu Progresso:</span>
@@ -532,41 +769,149 @@ function toggleSection(id: number) {
             </span>
           </div>
 
-          <button
-            className="btn btn-primary mark-complete"
-            disabled={!canComplete || saving}
-            onClick={async () => {
-              try {
-                setSaving(true);
-                await http.put(`/trails/${trailId}/items/${detail.id}/progress`, {
-                  status: "COMPLETED",
-                  progress_value: Math.floor(watch.current),
-                });
-                const p = await http.get<ProgressTotal>(`/user-trails/${trailId}/progress`);
-                setProgress(p.data);
-              } finally {
-                setSaving(false);
-              }
-            }}
-            title={canComplete ? "Marcar como concluído" : `Assista pelo menos ${detail.required_percentage}%`}
-          >
-            {saving ? "Salvando…" : "Marcar como concluído"}
-          </button>
+          {progress.status && (
+            <span
+              className={`trail-status-badge status-${progress.status.toLowerCase()}`}
+            >
+              {formatStatus(progress.status)}
+            </span>
+          )}
+
+          {detail.type === "VIDEO" && (
+            <button
+              className="btn btn-primary mark-complete"
+              disabled={!canComplete || saving || progress.status === "COMPLETED"}
+              onClick={async () => {
+                try {
+                  setSaving(true);
+                  await http.put(`/trails/${trailId}/items/${detail.id}/progress`, {
+                    status: "COMPLETED",
+                    progress_value: Math.floor(watch.current),
+                  });
+                  await loadProgress();
+                } finally {
+                  setSaving(false);
+                }
+              }}
+              title={canComplete ? "Marcar como concluído" : `Assista pelo menos ${detail.required_percentage ?? 70}%`}
+            >
+              {saving ? "Salvando…" : "Marcar como concluído"}
+            </button>
+          )}
 
           <button className="btn btn-icon close" onClick={() => navigate(`/trilhas/${trailId}`)}>
             ✕
           </button>
         </div>
 
-        <div className="video-wrapper">
+        {detail.type === "VIDEO" && detail.youtubeId ? (
+          <div className="video-wrapper">
+            <YouTubePlayer
+              videoId={detail.youtubeId}
+              startAt={0}
+              onReady={({ current, duration }) => setWatch({ current, duration })}
+              onProgress={({ current, duration }) => setWatch({ current, duration })}
+            />
+          </div>
+        ) : detail.type === "FORM" && detail.form ? (
+          <div className="form-wrapper">
+            {detail.form.title && <h2 className="form-title">{detail.form.title}</h2>}
+            {formResult && (
+              <div className={`form-result ${formResult.passed === false ? "is-fail" : ""}`}>
+                <strong>Resultado:</strong> {formResult.score.toFixed(2)}%
+                <span className="form-result-points">
+                  ({formResult.score_points.toFixed(2)} / {formResult.max_points.toFixed(2)} pts)
+                </span>
+                {formResult.passed !== null && (
+                  <span className="form-result-badge">{formResult.passed ? "Aprovado" : "Reprovado"}</span>
+                )}
+                {formResult.requires_manual_review && (
+                  <p className="form-result-note">Esta tentativa aguarda correção manual.</p>
+                )}
+                {!formResult.requires_manual_review && detail.form && (
+                  <p className="form-result-note">
+                    Nota mínima para aprovação: {detail.form.min_score_to_pass.toFixed(2)}%
+                  </p>
+                )}
+              </div>
+            )}
+            {formError && (
+              <div className="form-error" role="alert">
+                {formError}
+              </div>
+            )}
 
-          <YouTubePlayer
-            videoId={detail.youtubeId}
-            startAt={0}
-            onReady={({ current, duration }) => setWatch({ current, duration })}
-            onProgress={({ current, duration }) => setWatch({ current, duration })}
-          />
-        </div>
+            <form
+              className="trail-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void submitFormAnswers();
+              }}
+            >
+              {detail.form.questions.length === 0 && (
+                <p className="question-note">Nenhuma questão configurada para este formulário.</p>
+              )}
+              {detail.form.questions.map((question) => {
+                const stored = formAnswers[question.id];
+                const result = questionResultMap.get(question.id);
+                const label = questionOrderMap.get(question.id) ?? question.order_index + 1;
+                return (
+                  <fieldset
+                    key={question.id}
+                    className={`form-question ${result ? (result.is_correct === true ? "is-correct" : result.is_correct === false ? "is-incorrect" : "is-pending") : ""}`}
+                  >
+                    <legend>
+                      <span className="question-index">Questão {label}</span>
+                      {question.required && <span className="question-required">*</span>}
+                    </legend>
+                    <p className="question-prompt">{question.prompt}</p>
+
+                    {question.type === "ESSAY" ? (
+                      <textarea
+                        value={stored?.answerText ?? ""}
+                        onChange={(e) => handleEssayChange(question.id, e.target.value)}
+                        rows={4}
+                        placeholder="Digite sua resposta"
+                      />
+                    ) : (
+                      <div className="question-options">
+                        {question.options.map((option) => (
+                          <label key={option.id} className="question-option">
+                            <input
+                              type="radio"
+                              name={`question-${question.id}`}
+                              value={option.id}
+                              checked={stored?.selectedOptionId === option.id}
+                              onChange={() => handleOptionChange(question.id, option.id)}
+                            />
+                            <span>{option.text}</span>
+                          </label>
+                        ))}
+                        {question.options.length === 0 && (
+                          <p className="question-note">Opções não configuradas para esta questão.</p>
+                        )}
+                      </div>
+                    )}
+
+                    {result && (
+                      <div className="question-feedback">
+                        {result.is_correct === true && <span className="is-correct">Resposta correta (+{result.points_awarded ?? 0} pts)</span>}
+                        {result.is_correct === false && <span className="is-incorrect">Resposta incorreta</span>}
+                        {result.is_correct === null && <span className="is-pending">Avaliação pendente</span>}
+                      </div>
+                    )}
+                  </fieldset>
+                );
+              })}
+
+              <button type="submit" className="btn btn-primary" disabled={formSubmitting}>
+                {formSubmitting ? "Enviando respostas…" : "Enviar respostas"}
+              </button>
+            </form>
+          </div>
+        ) : (
+          <div className="lesson-placeholder">Conteúdo não disponível para este item.</div>
+        )}
 
         <section className="lesson-about">
           <h3>Sobre a Aula</h3>
@@ -609,4 +954,14 @@ function fmtDuration(sec: number) {
   const h = Math.floor(sec / 3600);
   if (h > 0) return `${h}:${pad(m)}:${pad(s)}`;
   return `${pad(m)}:${pad(s)}`;
+}
+
+function formatStatus(status?: string | null) {
+  if (!status) return "";
+  const map: Record<string, string> = {
+    COMPLETED: "Concluída",
+    IN_PROGRESS: "Em andamento",
+    ENROLLED: "Inscrito",
+  };
+  return map[status] ?? status;
 }

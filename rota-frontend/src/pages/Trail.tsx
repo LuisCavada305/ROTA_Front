@@ -12,6 +12,7 @@ type Item = {
   duration_seconds?: number | null;
   order_index?: number | null;
   type?: string | null; // "VIDEO" | "QUIZ" | "PDF" etc.
+  requires_completion?: boolean | null;
 };
 
 type Section = {
@@ -72,6 +73,7 @@ type ItemDetail = {
   prev_item_id?: number | null;
   next_item_id?: number | null;
   form?: FormSchema | null;
+  requires_completion?: boolean | null;
 };
 
 type FormResult = {
@@ -488,6 +490,8 @@ export default function Trail() {
   const [formSubmitting, setFormSubmitting] = useState(false);
   const [formResult, setFormResult] = useState<FormResult | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [lockedItems, setLockedItems] = useState<Record<number, { id: number; title: string } | null>>({});
+  const [blockedBy, setBlockedBy] = useState<{ id: number; title: string } | null>(null);
 
   // quais sections estão abertas (expandidas)
   const [openSections, setOpenSections] = useState<Set<number>>(new Set());
@@ -529,6 +533,57 @@ export default function Trail() {
       });
     }
   }, [trailId]);
+
+  useEffect(() => {
+    if (!sections.length) {
+      setLockedItems({});
+      return;
+    }
+
+    const orderSections = [...sections].sort((a, b) => {
+      const aOrd = a.order_index ?? 0;
+      const bOrd = b.order_index ?? 0;
+      if (aOrd !== bOrd) return aOrd - bOrd;
+      return a.id - b.id;
+    });
+
+    const next: Record<number, { id: number; title: string } | null> = {};
+    let blocker: { id: number; title: string } | null = null;
+
+    const isCompleted = (itemId: number) =>
+      itemProgress[itemId]?.status === "COMPLETED";
+
+    for (const section of orderSections) {
+      const orderedItems = [...section.items].sort((a, b) => {
+        const aOrd = a.order_index ?? 0;
+        const bOrd = b.order_index ?? 0;
+        if (aOrd !== bOrd) return aOrd - bOrd;
+        return a.id - b.id;
+      });
+
+      for (const item of orderedItems) {
+        const effectiveBlocker =
+          blocker && blocker.id === item.id ? null : blocker;
+        next[item.id] = effectiveBlocker;
+
+        if (!item.requires_completion) {
+          continue;
+        }
+
+        const completed = isCompleted(item.id);
+        if (blocker && blocker.id === item.id && completed) {
+          blocker = null;
+        } else if (!blocker && !completed) {
+          blocker = {
+            id: item.id,
+            title: item.title || "Item obrigatório",
+          };
+        }
+      }
+    }
+
+    setLockedItems(next);
+  }, [sections, itemProgress]);
 
   // abre a seção da aula atual ao carregar/trocar de item
   useEffect(() => {
@@ -606,6 +661,9 @@ export default function Trail() {
     if (!detail?.form) return new Map<number, number>();
     return new Map(detail.form.questions.map((q, index) => [q.id, index + 1]));
   }, [detail?.form]);
+
+  const blockedTitle = blockedBy?.title?.trim() || "o item obrigatório";
+  const blockedTargetId = typeof blockedBy?.id === "number" ? blockedBy.id : null;
 
   const questionResultMap = useMemo(() => {
     if (!formResult) return new Map<number, FormResult["answers"][number]>();
@@ -708,29 +766,59 @@ export default function Trail() {
     let mounted = true;
     (async () => {
       if (!trailId || !itemId) return;
+      setLoading(true);
       try {
-        setLoading(true);
-        const [secsRes, detRes] = await Promise.all([
+        const [sectionsResult, detailResult] = await Promise.allSettled([
           http.get<Section[]>(`/trails/${trailId}/sections-with-items`),
           http.get<ItemDetail>(`/trails/${trailId}/items/${itemId}`),
         ]);
 
         if (!mounted) return;
 
-        sectionsRef.current = secsRes.data;
-        setSections(secsRes.data);
-
-        const detailData = detRes.data as ItemDetail;
-        setDetail(detailData);
-
-        setMaxWatched(0);
-        if (detailData.type === "VIDEO") {
-          setWatch({
-            current: 0,
-            duration: detailData.duration_seconds ?? 0,
-          });
+        if (sectionsResult.status === "fulfilled") {
+          const secsData = sectionsResult.value.data ?? [];
+          sectionsRef.current = secsData;
+          setSections(secsData);
         } else {
-          setWatch({ current: 0, duration: 0 });
+          throw sectionsResult.reason;
+        }
+
+        let resolvedDetail: ItemDetail | null = null;
+
+        if (detailResult.status === "fulfilled") {
+          resolvedDetail = detailResult.value.data as ItemDetail;
+          setBlockedBy(null);
+          setDetail(resolvedDetail);
+          setMaxWatched(0);
+          if (resolvedDetail.type === "VIDEO") {
+            setWatch({
+              current: 0,
+              duration: resolvedDetail.duration_seconds ?? 0,
+            });
+          } else {
+            setWatch({ current: 0, duration: 0 });
+          }
+        } else {
+          const error: any = detailResult.reason;
+          const status = error?.response?.status;
+          if (status === 423 && error?.response?.data?.reason === "item_locked") {
+            const blocked = error.response?.data?.blocked_item;
+            setBlockedBy(
+              blocked && typeof blocked.id === "number"
+                ? { id: blocked.id, title: blocked.title ?? "" }
+                : null
+            );
+            setDetail(null);
+            setMaxWatched(0);
+            setWatch({ current: 0, duration: 0 });
+          } else if (status === 404) {
+            setBlockedBy(null);
+            setDetail(null);
+            setMaxWatched(0);
+            setWatch({ current: 0, duration: 0 });
+          } else {
+            throw error;
+          }
         }
 
         setFormAnswers({});
@@ -738,6 +826,10 @@ export default function Trail() {
         setFormError(null);
 
         await loadProgress();
+      } catch (error) {
+        if (!mounted) return;
+        // eslint-disable-next-line no-console
+        console.error("Falha ao carregar conteúdo da trilha", error);
       } finally {
         if (mounted) setLoading(false);
       }
@@ -765,7 +857,7 @@ export default function Trail() {
     return () => clearTimeout(id);
   }, [watchedSeconds, canComplete, trailId, detail, loadProgress]);
 
-  if (loading || !detail || !progress) {
+  if (loading || !progress) {
     return <div className="lesson-page loading">Carregando…</div>;
   }
 
@@ -814,11 +906,18 @@ export default function Trail() {
           const progressInfo = itemProgress[i.id];
           const isDone = progressInfo?.status === "COMPLETED";
           const isCurrent = String(i.id) === itemId;
+          const lockInfo = lockedItems[i.id] ?? null;
+          const isLocked = Boolean(lockInfo);
+          const lockTitle = lockInfo?.title?.trim() || "o item obrigatório";
+          const lockHint = isLocked ? `Conclua ${lockTitle} antes de prosseguir.` : undefined;
+
           return (
             <Link
               key={i.id}
               to={`/trilha/${trailId}/aula/${i.id}`}
-              className={`topic-item ${isCurrent ? "is-active" : ""} ${isDone ? "is-done" : ""}`}
+              className={`topic-item ${isCurrent ? "is-active" : ""} ${isDone ? "is-done" : ""} ${isLocked ? "is-locked" : ""}`}
+              title={lockHint}
+              aria-disabled={isLocked}
             >
               <div className="left">
                 <span className={`item-icon ${resolveIconClass(i.type)}`} />
@@ -827,6 +926,11 @@ export default function Trail() {
               <div className="right">
                 {typeof i.duration_seconds === "number" && i.type !== "QUIZ" && (
                   <span className="item-duration">{fmtDuration(i.duration_seconds)}</span>
+                )}
+                {isLocked && (
+                  <span className="item-status item-status-locked" aria-label={`Bloqueado até concluir ${lockTitle}`}>
+                    Bloqueado
+                  </span>
                 )}
                 {isDone && <span className="item-status" aria-label="Item concluído">✓</span>}
               </div>
@@ -842,207 +946,237 @@ export default function Trail() {
 
       {/* Main */}
       <main className="lesson-main">
-        <div className="topbar">
-          <div className="crumb-title">{detail.title}</div>
-
-          <div className="progress-wrap">
-            <span className="muted">Seu Progresso:</span>
-            <span className="strong">{progress.done}</span>
-            <span className="muted">de</span>
-            <span className="strong">{progress.total}</span>
-            <span className="muted">
-              ({Math.round(progress.computed_progress_percent || 0)}%)
-            </span>
+        {blockedBy ? (
+          <div className="lesson-locked" role="alert">
+            <h2>Conteúdo bloqueado</h2>
+            <p>
+              Conclua <strong>{blockedTitle}</strong> antes de prosseguir.
+            </p>
+            {blockedTargetId ? (
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={() => {
+                  setBlockedBy(null);
+                  navigate(`/trilha/${trailId}/aula/${blockedTargetId}`);
+                }}
+              >
+                Ir para {blockedTitle}
+              </button>
+            ) : null}
           </div>
+        ) : detail ? (
+          <>
+            <div className="topbar">
+              <div className="crumb-title">{detail.title}</div>
 
-          {progress.status && (
-            <span
-              className={`trail-status-badge status-${progress.status.toLowerCase()}`}
-            >
-              {formatStatus(progress.status)}
-            </span>
-          )}
-
-          {detail.type === "VIDEO" && (
-            <span className="video-auto-note">O vídeo é concluído automaticamente ao atingir a porcentagem mínima.</span>
-          )}
-
-          {showManualCompletion && (
-            <button
-              className="btn btn-primary mark-complete"
-              disabled={saving || progress.status === "COMPLETED"}
-              onClick={async () => {
-                try {
-                  setSaving(true);
-              await http.put(`/trails/${trailId}/items/${detail.id}/progress`, {
-                status: "COMPLETED",
-                progress_value: detail.type === "VIDEO" ? Math.floor(watchedSeconds) : null,
-              });
-                  await loadProgress();
-                } finally {
-                  setSaving(false);
-                }
-              }}
-              title="Marcar como concluído"
-            >
-              {saving ? "Salvando…" : "Marcar como concluído"}
-            </button>
-          )}
-
-          <button className="btn btn-icon close" onClick={() => navigate(`/trilhas/${trailId}`)}>
-            ✕
-          </button>
-        </div>
-
-        {detail.type === "VIDEO" && detail.youtubeId ? (
-          <div className="video-wrapper">
-            <YouTubePlayer
-              videoId={detail.youtubeId}
-              startAt={0}
-              onReady={({ current, duration }) => {
-                setWatch({ current, duration });
-                setMaxWatched(Math.max(0, current));
-              }}
-              onProgress={({ current, duration }) => {
-                setWatch({ current, duration });
-                setMaxWatched((prev) => Math.max(prev, current));
-              }}
-              maxAllowedPosition={maxSeekPosition}
-              seekBlockedLabel={seekBlockedLabel}
-            />
-            {!isPrivileged && (
-              <p className="video-note">
-                Você pode arrastar a linha do tempo apenas até o ponto já assistido.
-              </p>
-            )}
-          </div>
-        ) : detail.type === "FORM" && detail.form ? (
-          <div className="form-wrapper">
-            {detail.form.title && <h2 className="form-title">{detail.form.title}</h2>}
-            {formResult && (
-              <div className={`form-result ${formResult.passed === false ? "is-fail" : ""}`}>
-                <strong>Resultado:</strong> {formResult.score.toFixed(2)}%
-                <span className="form-result-points">
-                  ({formResult.score_points.toFixed(2)} / {formResult.max_points.toFixed(2)} pts)
+              <div className="progress-wrap">
+                <span className="muted">Seu Progresso:</span>
+                <span className="strong">{progress.done}</span>
+                <span className="muted">de</span>
+                <span className="strong">{progress.total}</span>
+                <span className="muted">
+                  ({Math.round(progress.computed_progress_percent || 0)}%)
                 </span>
-                {formResult.passed !== null && (
-                  <span className="form-result-badge">{formResult.passed ? "Aprovado" : "Reprovado"}</span>
-                )}
-                {formResult.requires_manual_review && (
-                  <p className="form-result-note">Esta tentativa aguarda correção manual.</p>
-                )}
-                {!formResult.requires_manual_review && detail.form && (
-                  <p className="form-result-note">
-                    Nota mínima para aprovação: {detail.form.min_score_to_pass.toFixed(2)}%
+              </div>
+
+              {progress.status && (
+                <span
+                  className={`trail-status-badge status-${progress.status.toLowerCase()}`}
+                >
+                  {formatStatus(progress.status)}
+                </span>
+              )}
+
+              {detail.type === "VIDEO" && (
+                <span className="video-auto-note">O vídeo é concluído automaticamente ao atingir a porcentagem mínima.</span>
+              )}
+
+              {showManualCompletion && (
+                <button
+                  className="btn btn-primary mark-complete"
+                  disabled={saving || progress.status === "COMPLETED"}
+                  onClick={async () => {
+                    try {
+                      setSaving(true);
+                      await http.put(`/trails/${trailId}/items/${detail.id}/progress`, {
+                        status: "COMPLETED",
+                        progress_value: detail.type === "VIDEO"
+                          ? Math.floor(watchedSeconds)
+                          : null,
+                      });
+                      await loadProgress();
+                    } finally {
+                      setSaving(false);
+                    }
+                  }}
+                  title="Marcar como concluído"
+                >
+                  {saving ? "Salvando…" : "Marcar como concluído"}
+                </button>
+              )}
+
+              <button className="btn btn-icon close" onClick={() => navigate(`/trilhas/${trailId}`)}>
+                ✕
+              </button>
+            </div>
+
+            {detail.type === "VIDEO" && detail.youtubeId ? (
+              <div className="video-wrapper">
+                <YouTubePlayer
+                  videoId={detail.youtubeId}
+                  startAt={0}
+                  onReady={({ current, duration }) => {
+                    setWatch({ current, duration });
+                    setMaxWatched(Math.max(0, current));
+                  }}
+                  onProgress={({ current, duration }) => {
+                    setWatch({ current, duration });
+                    setMaxWatched((prev) => Math.max(prev, current));
+                  }}
+                  maxAllowedPosition={maxSeekPosition}
+                  seekBlockedLabel={seekBlockedLabel}
+                />
+                {!isPrivileged && (
+                  <p className="video-note">
+                    Você pode arrastar a linha do tempo apenas até o ponto já assistido.
                   </p>
                 )}
               </div>
-            )}
-            {formError && (
-              <div className="form-error" role="alert">
-                {formError}
-              </div>
-            )}
+            ) : detail.type === "FORM" && detail.form ? (
+              <div className="form-wrapper">
+                {detail.form.title && <h2 className="form-title">{detail.form.title}</h2>}
+                {formResult && (
+                  <div className={`form-result ${formResult.passed === false ? "is-fail" : ""}`}>
+                    <strong>Resultado:</strong> {formResult.score.toFixed(2)}%
+                    <span className="form-result-points">
+                      ({formResult.score_points.toFixed(2)} / {formResult.max_points.toFixed(2)} pts)
+                    </span>
+                    {formResult.passed !== null && (
+                      <span className="form-result-badge">{formResult.passed ? "Aprovado" : "Reprovado"}</span>
+                    )}
+                    {formResult.requires_manual_review && (
+                      <p className="form-result-note">Esta tentativa aguarda correção manual.</p>
+                    )}
+                    {!formResult.requires_manual_review && detail.form && (
+                      <p className="form-result-note">
+                        Nota mínima para aprovação: {detail.form.min_score_to_pass.toFixed(2)}%
+                      </p>
+                    )}
+                  </div>
+                )}
+                {formError && (
+                  <div className="form-error" role="alert">
+                    {formError}
+                  </div>
+                )}
 
-            <form
-              className="trail-form"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void submitFormAnswers();
-              }}
-            >
-              {detail.form.questions.length === 0 && (
-                <p className="question-note">Nenhuma questão configurada para este formulário.</p>
-              )}
-              {detail.form.questions.map((question) => {
-                const stored = formAnswers[question.id];
-                const result = questionResultMap.get(question.id);
-                const label = questionOrderMap.get(question.id) ?? question.order_index + 1;
-                return (
-                  <fieldset
-                    key={question.id}
-                    className={`form-question ${result ? (result.is_correct === true ? "is-correct" : result.is_correct === false ? "is-incorrect" : "is-pending") : ""}`}
-                  >
-                    <legend>
-                      <span className="question-index">Questão {label}</span>
-                      {question.required && <span className="question-required">*</span>}
-                    </legend>
-                    <p className="question-prompt">{question.prompt}</p>
+                <form
+                  className="trail-form"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void submitFormAnswers();
+                  }}
+                >
+                  {detail.form.questions.length === 0 && (
+                    <p className="question-note">Nenhuma questão configurada para este formulário.</p>
+                  )}
+                  {detail.form.questions.map((question) => {
+                    const stored = formAnswers[question.id];
+                    const result = questionResultMap.get(question.id);
+                    const label = questionOrderMap.get(question.id) ?? question.order_index + 1;
+                    return (
+                      <fieldset
+                        key={question.id}
+                        className={`form-question ${result ? (result.is_correct === true ? "is-correct" : result.is_correct === false ? "is-incorrect" : "is-pending") : ""}`}
+                      >
+                        <legend>
+                          <span className="question-index">Questão {label}</span>
+                          {question.required && <span className="question-required">*</span>}
+                        </legend>
+                        <p className="question-prompt">{question.prompt}</p>
 
-                    {question.type === "ESSAY" ? (
-                      <textarea
-                        value={stored?.answerText ?? ""}
-                        onChange={(e) => handleEssayChange(question.id, e.target.value)}
-                        rows={4}
-                        placeholder="Digite sua resposta"
-                      />
-                    ) : (
-                      <div className="question-options">
-                        {question.options.map((option) => (
-                          <label key={option.id} className="question-option">
-                            <input
-                              type="radio"
-                              name={`question-${question.id}`}
-                              value={option.id}
-                              checked={stored?.selectedOptionId === option.id}
-                              onChange={() => handleOptionChange(question.id, option.id)}
-                            />
-                            <span>{option.text}</span>
-                          </label>
-                        ))}
-                        {question.options.length === 0 && (
-                          <p className="question-note">Opções não configuradas para esta questão.</p>
+                        {question.type === "ESSAY" ? (
+                          <textarea
+                            value={stored?.answerText ?? ""}
+                            onChange={(e) => handleEssayChange(question.id, e.target.value)}
+                            rows={4}
+                            placeholder="Digite sua resposta"
+                          />
+                        ) : (
+                          <div className="question-options">
+                            {question.options.map((option) => (
+                              <label key={option.id} className="question-option">
+                                <input
+                                  type="radio"
+                                  name={`question-${question.id}`}
+                                  value={option.id}
+                                  checked={stored?.selectedOptionId === option.id}
+                                  onChange={() => handleOptionChange(question.id, option.id)}
+                                />
+                                <span>{option.text}</span>
+                              </label>
+                            ))}
+                            {question.options.length === 0 && (
+                              <p className="question-note">Opções não configuradas para esta questão.</p>
+                            )}
+                          </div>
                         )}
-                      </div>
-                    )}
 
-                    {result && (
-                      <div className="question-feedback">
-                        {result.is_correct === true && <span className="is-correct">Resposta correta (+{result.points_awarded ?? 0} pts)</span>}
-                        {result.is_correct === false && <span className="is-incorrect">Resposta incorreta</span>}
-                        {result.is_correct === null && <span className="is-pending">Avaliação pendente</span>}
-                      </div>
-                    )}
-                  </fieldset>
-                );
-              })}
+                        {result && (
+                          <div className="question-feedback">
+                            {result.is_correct === true && <span className="is-correct">Resposta correta (+{result.points_awarded ?? 0} pts)</span>}
+                            {result.is_correct === false && <span className="is-incorrect">Resposta incorreta</span>}
+                            {result.is_correct === null && <span className="is-pending">Avaliação pendente</span>}
+                          </div>
+                        )}
+                      </fieldset>
+                    );
+                  })}
 
-              <button type="submit" className="btn btn-primary" disabled={formSubmitting}>
-                {formSubmitting ? "Enviando respostas…" : "Enviar respostas"}
-              </button>
-            </form>
-          </div>
+                  <button type="submit" className="btn btn-primary" disabled={formSubmitting}>
+                    {formSubmitting ? "Enviando respostas…" : "Enviar respostas"}
+                  </button>
+                </form>
+              </div>
+            ) : (
+              <div className="lesson-placeholder">Conteúdo não disponível para este item.</div>
+            )}
+
+            <section className="lesson-about">
+              <h3>Sobre a Aula</h3>
+              <div className="about-html" dangerouslySetInnerHTML={{ __html: detail.description_html }} />
+            </section>
+
+            <footer className="lesson-footer">
+              <div className="footer-left">
+                {detail.prev_item_id ? (
+                  <Link className="btn btn-secondary btn-sm" to={`/trilha/${trailId}/aula/${detail.prev_item_id}`}>
+                    <span className="icon-previous" />
+                    <span>Anterior</span>
+                  </Link>
+                ) : (
+                  <span />
+                )}
+              </div>
+              <div className="footer-right">
+                {detail.next_item_id ? (
+                  <Link className="btn btn-secondary btn-sm" to={`/trilha/${trailId}/aula/${detail.next_item_id}`}>
+                    <span>Próximo</span>
+                    <span className="icon-next" />
+                  </Link>
+                ) : (
+                  <span />
+                )}
+              </div>
+            </footer>
+          </>
         ) : (
-          <div className="lesson-placeholder">Conteúdo não disponível para este item.</div>
+          <div className="lesson-locked">
+            <h2>Conteúdo indisponível</h2>
+            <p>Não foi possível carregar esta aula. Tente novamente mais tarde.</p>
+          </div>
         )}
-
-        <section className="lesson-about">
-          <h3>Sobre a Aula</h3>
-          <div className="about-html" dangerouslySetInnerHTML={{ __html: detail.description_html }} />
-        </section>
-
-        <footer className="lesson-footer">
-          <div className="footer-left">
-            {detail.prev_item_id ? (
-              <Link className="btn btn-secondary btn-sm" to={`/trilha/${trailId}/aula/${detail.prev_item_id}`}>
-                <span className="icon-previous" />
-                <span>Anterior</span>
-              </Link>
-            ) : (
-              <span />
-            )}
-          </div>
-          <div className="footer-right">
-            {detail.next_item_id ? (
-              <Link className="btn btn-secondary btn-sm" to={`/trilha/${trailId}/aula/${detail.next_item_id}`}>
-                <span>Próximo</span>
-                <span className="icon-next" />
-              </Link>
-            ) : (
-              <span />
-            )}
-          </div>
-        </footer>
       </main>
     </div>
     </Layout>

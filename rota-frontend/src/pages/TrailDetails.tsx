@@ -1,8 +1,8 @@
 import Layout from "../components/Layout";
 import "../styles/TrailDetails.css";
 import { http } from "../lib/http";
-import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { normalizePaginatedPayload, type PaginatedPayload } from "../types/Pagination";
 
 type SectionItem = {
@@ -31,6 +31,12 @@ type TrailCore = {
 
 type TextValRow = { text_val: string };
 
+type CertificateSummary = {
+  hash: string;
+  credential_id: string;
+  issued_at?: string | null;
+} | null;
+
 type Progress = {
   done: number;
   total: number;
@@ -39,6 +45,7 @@ type Progress = {
   pct?: number;        // calculado/fallback
   status?: string | null;
   completed_at?: string | null;
+  certificate?: CertificateSummary;
 };
 
 function secondsToMMSS(total?: number | null) {
@@ -64,6 +71,8 @@ export default function TrailDetails() {
   const [err, setErr] = useState<string | null>(null);
   const [enrolling, setEnrolling] = useState(false);
   const [enrollError, setEnrollError] = useState<string | null>(null);
+  const [certLoading, setCertLoading] = useState(false);
+  const [certError, setCertError] = useState<string | null>(null);
   const navigate = useNavigate();
 
   // "View model" final que a UI consome
@@ -165,11 +174,23 @@ export default function TrailDetails() {
 
         // 4) progresso do usuário nessa trilha
         const pProgress = http
-          .get<Partial<Progress> & { computed_progress_percent?: number; started_at?: string }>(
+          .get<Partial<Progress> & {
+            computed_progress_percent?: number;
+            started_at?: string;
+            certificate?: { hash: string; credential_id: string; issued_at?: string | null } | null;
+          }>(
             `/user-trails/${id}/progress`
           )
-          .then(r => r.data as Partial<Progress> & { computed_progress_percent?: number; started_at?: string })
-          .catch(() => ({} as Partial<Progress> & { computed_progress_percent?: number; started_at?: string }));
+          .then(r => r.data as Partial<Progress> & {
+            computed_progress_percent?: number;
+            started_at?: string;
+            certificate?: { hash: string; credential_id: string; issued_at?: string | null } | null;
+          })
+          .catch(() => ({}) as Partial<Progress> & {
+            computed_progress_percent?: number;
+            started_at?: string;
+            certificate?: { hash: string; credential_id: string; issued_at?: string | null } | null;
+          });
 
         // 5) pegar “aprendizados” (se existir; senão usamos vazio)
         const pLearn = http
@@ -231,6 +252,7 @@ export default function TrailDetails() {
           pct: pctFromBack ?? pctCalc,
           status: progressRaw?.status ?? null,
           completed_at: progressRaw?.completed_at ?? null,
+          certificate: progressRaw?.certificate ?? null,
         };
 
         const nextLessonDate = progress.enrolledAt
@@ -266,6 +288,45 @@ export default function TrailDetails() {
       mounted = false;
     };
   }, [id]);
+
+  const fetchCertificate = useCallback(async () => {
+    if (!vm?.id) return null;
+    const trailId = vm.id;
+    const { data } = await http.get<{
+      certificate_hash: string;
+      credential_id: string;
+      issued_at?: string | null;
+    }>(`/certificates/me/trails/${trailId}`);
+
+    const normalized = {
+      hash: data.certificate_hash,
+      credential_id: data.credential_id,
+      issued_at: data.issued_at ?? null,
+    } as CertificateSummary;
+
+    setVm((prev) =>
+      prev && prev.id === trailId
+        ? {
+            ...prev,
+            progress: {
+              ...prev.progress,
+              certificate: normalized,
+            },
+          }
+        : prev
+    );
+
+    return normalized;
+  }, [vm?.id, setVm]);
+
+  useEffect(() => {
+    if (!vm) return;
+    if (vm.progress.status !== "COMPLETED") return;
+    if (vm.progress.certificate) return;
+    fetchCertificate().catch((err) => {
+      console.warn("Não foi possível carregar o certificado", err);
+    });
+  }, [vm?.progress.status, vm?.progress.certificate, fetchCertificate]);
 
   const pct = useMemo(() => vm?.progress?.pct ?? 0, [vm]);
   const firstItemId = useMemo(() => {
@@ -353,6 +414,31 @@ export default function TrailDetails() {
 
     if (firstItemId) {
       navigate(`/trilha/${vm.id}/aula/${firstItemId}`);
+    }
+  };
+
+  const handleViewCertificate = async () => {
+    if (!vm) return;
+    setCertError(null);
+
+    const existing = vm.progress.certificate;
+    if (existing?.hash) {
+      navigate(`/certificados/?cert_hash=${existing.hash}`);
+      return;
+    }
+
+    try {
+      setCertLoading(true);
+      const cert = await fetchCertificate();
+      if (!cert?.hash) {
+        setCertError("Certificado ainda não disponível. Tente novamente em instantes.");
+        return;
+      }
+      navigate(`/certificados/?cert_hash=${cert.hash}`);
+    } catch (err) {
+      setCertError("Não foi possível abrir o certificado agora.");
+    } finally {
+      setCertLoading(false);
     }
   };
 
@@ -497,6 +583,26 @@ export default function TrailDetails() {
                 >
                   {enrolling ? "Processando…" : primaryActionLabel}
                 </button>
+                {vm.progress.status === "COMPLETED" ? (
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-block cert-button"
+                    onClick={handleViewCertificate}
+                    disabled={certLoading}
+                  >
+                    {certLoading ? "Abrindo certificado…" : "Ver certificado"}
+                  </button>
+                ) : null}
+                {vm.progress.certificate?.issued_at && (
+                  <div className="cert-issued">
+                    Certificado emitido em {new Date(vm.progress.certificate.issued_at).toLocaleDateString("pt-BR")}
+                  </div>
+                )}
+                {certError && (
+                  <div className="cert-error" role="alert">
+                    {certError}
+                  </div>
+                )}
                 {enrollError && (
                   <div className="enroll-error" role="alert">
                     {enrollError}

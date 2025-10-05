@@ -8,6 +8,7 @@ import CourseDetails from "./pages/TrailDetails";
 // import Members from "./pages/Members";
 // import Forum from "./pages/Forum";
 import Trail from "./pages/Trail";
+import Certificate from "./pages/Certificate";
 
 
 
@@ -22,6 +23,7 @@ export default function App() {
         <Route path="/trilhas" element={<Trails />} />
         <Route path="/trail-details/:id" element={<CourseDetails />} />
         <Route path="/trilha/:trailId/aula/:itemId" element={<Trail />} />
+        <Route path="/certificados" element={<Certificate />} />
         {/* 
         <Route path="/membros" element={<Members />} />
         

@@ -171,6 +171,30 @@
 .progress-status.status-in_progress { background: #fef9c3; color: #b45309; }
 .progress-status.status-enrolled { background: #e0f2fe; color: #0369a1; }
 .progress-meta { margin-top: 6px; font-size: .85rem; color: var(--muted); }
+.trail-progress .cert-button {
+  margin-top: 8px;
+  background: #f9fafb;
+  border-color: #d1d5db;
+  color: var(--text);
+}
+.trail-progress .cert-button:hover,
+.trail-progress .cert-button:focus {
+  background: #eef2ff;
+  border-color: var(--brand);
+  color: var(--brand);
+}
+.trail-progress .cert-issued {
+  margin-top: 6px;
+  font-size: .82rem;
+  color: var(--muted);
+  text-align: center;
+}
+.trail-progress .cert-error {
+  margin-top: 6px;
+  font-size: .82rem;
+  color: #b91c1c;
+  text-align: center;
+}
 
 /* Botões menores, como no original */
 .btn{ height: 34px; padding: 0 12px; border-radius: 10px; font-weight: 600; }

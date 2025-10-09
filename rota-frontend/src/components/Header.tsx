@@ -76,7 +76,7 @@ export default function Header() {
               </NavLink>
             </li>
             <li className="menu-item">
-              <NavLink to="/forum" className={({ isActive }) => (isActive ? "active" : undefined)}>
+              <NavLink to="/foruns" className={({ isActive }) => (isActive ? "active" : undefined)}>
                 <MessageSquare size={18} />
                 <span>Fóruns</span>
               </NavLink>
@@ -136,7 +136,7 @@ export default function Header() {
           <li><NavLink to="/" end onClick={closeMobile} className={({isActive})=>isActive?'active':undefined}><Home size={18}/><span>Home</span></NavLink></li>
           <li><NavLink to="/trilhas" onClick={closeMobile} className={({isActive})=>isActive?'active':undefined}><GraduationCap size={18}/><span>Trilhas</span></NavLink></li>
           <li><NavLink to="/membros" onClick={closeMobile} className={({isActive})=>isActive?'active':undefined}><Users size={18}/><span>Membros Enactus</span></NavLink></li>
-          <li><NavLink to="/forum" onClick={closeMobile} className={({isActive})=>isActive?'active':undefined}><MessageSquare size={18}/><span>Fóruns</span></NavLink></li>
+          <li><NavLink to="/foruns" onClick={closeMobile} className={({isActive})=>isActive?'active':undefined}><MessageSquare size={18}/><span>Fóruns</span></NavLink></li>
         </ul>
 
         {/* Ações no drawer (mobile): também condicional */}

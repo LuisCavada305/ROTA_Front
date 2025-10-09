@@ -6,7 +6,7 @@ import AuthGate from "./components/AuthGate";
 import Trails from "./pages/Trails";
 import CourseDetails from "./pages/TrailDetails";
 // import Members from "./pages/Members";
-// import Forum from "./pages/Forum";
+import Forum from "./pages/Forum";
 import Trail from "./pages/Trail";
 import Certificate from "./pages/Certificate";
 
@@ -24,12 +24,8 @@ export default function App() {
         <Route path="/trail-details/:id" element={<CourseDetails />} />
         <Route path="/trilha/:trailId/aula/:itemId" element={<Trail />} />
         <Route path="/certificados" element={<Certificate />} />
-        {/* 
-        <Route path="/membros" element={<Members />} />
-        
-        
-        <Route path="/forum" element={<Forum />} />
-         */}
+        <Route path="/foruns/*" element={<Forum />} />
+        {/* <Route path="/membros" element={<Members />} /> */}
       </Routes>
     </>
   );

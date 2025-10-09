@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import Layout from "../components/Layout";
+import Avatar from "../components/Avatar";
 import { http } from "../lib/http";
 import type { PaginationMeta } from "../types/Pagination";
 import { useAuth } from "../hooks/useAuth";
@@ -56,6 +57,8 @@ type ForumPost = {
   created_at: string;
   updated_at: string;
   author?: ForumAuthor | null;
+  parent_post_id?: number | null;
+  replies?: ForumPost[];
 };
 
 type ForumListPayload = {
@@ -498,6 +501,7 @@ function TopicPostsView() {
   const [replyContent, setReplyContent] = useState("");
   const [replyError, setReplyError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<ForumPost | null>(null);
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const isAuthenticated = Boolean(user);
@@ -550,7 +554,10 @@ function TopicPostsView() {
     try {
       setSubmitting(true);
       setReplyError(null);
-      const payload = { content: replyContent.trim() };
+      const payload = {
+        content: replyContent.trim(),
+        parent_post_id: replyingTo?.id ?? null,
+      };
       const response = await http.post<CreatePostResponse>(`/forums/topics/${topicId}/posts`, payload);
       const createdPost = response.data.post;
       const updatedTopic = response.data.topic;
@@ -572,6 +579,7 @@ function TopicPostsView() {
       }
 
       setReplyContent("");
+      setReplyingTo(null);
     } catch (err: any) {
       const detail = err?.response?.data?.detail ?? "Não foi possível publicar a resposta.";
       setReplyError(detail);
@@ -582,6 +590,56 @@ function TopicPostsView() {
 
   const topic = data?.topic;
   const posts = data?.posts ?? [];
+
+  function startReply(post: ForumPost) {
+    setReplyingTo(post);
+    setReplyContent("");
+    window.requestAnimationFrame(() => {
+      document.getElementById("reply-content")?.focus({ preventScroll: false });
+    });
+  }
+
+  function renderPosts(tree: ForumPost[], depth = 0): JSX.Element | null {
+    if (!tree.length) return null;
+    const listClass = depth === 0 ? "forum-post-list" : "forum-post-list forum-post-replies";
+    return (
+      <ul className={listClass}>
+        {tree.map((post) => {
+          const isTarget = replyingTo?.id === post.id;
+          return (
+            <li key={post.id} className={`forum-post ${isTarget ? "is-target" : ""}`}>
+              <header>
+                <div className="forum-post-author">
+                  <Avatar
+                    name={post.author?.username ?? "Participante"}
+                    src={post.author?.profile_pic_url ?? null}
+                    size={40}
+                  />
+                  <div className="forum-post-author-meta">
+                    <strong>{post.author?.username ?? "Participante"}</strong>
+                    <time dateTime={post.created_at}>{formatDateTime(post.created_at)}</time>
+                  </div>
+                </div>
+              </header>
+              <p>{post.content}</p>
+              {isAuthenticated && (
+                <div className="forum-post-actions">
+                  <button
+                    type="button"
+                    className="forum-reply-link"
+                    onClick={() => startReply(post)}
+                  >
+                    Responder
+                  </button>
+                </div>
+              )}
+              {renderPosts(post.replies ?? [], depth + 1)}
+            </li>
+          );
+        })}
+      </ul>
+    );
+  }
 
   return (
     <div className="forum-page">
@@ -615,21 +673,7 @@ function TopicPostsView() {
         </div>
       )}
 
-      {!loading && !error && (
-        <ul className="forum-post-list">
-          {posts.map((post) => (
-            <li key={post.id} className="forum-post">
-              <header>
-                <div>
-                  <strong>{post.author?.username ?? "Participante"}</strong>
-                  <time dateTime={post.created_at}>{formatDateTime(post.created_at)}</time>
-                </div>
-              </header>
-              <p>{post.content}</p>
-            </li>
-          ))}
-        </ul>
-      )}
+      {!loading && !error && renderPosts(posts)}
 
       {emptyStateMessage(!loading && !error && posts.length === 0, "Nenhuma mensagem publicada ainda.")}
 
@@ -657,6 +701,14 @@ function TopicPostsView() {
       {isAuthenticated && (
         <form className="forum-reply" onSubmit={handleReply}>
           <label htmlFor="reply-content">Responder</label>
+          {replyingTo && (
+            <div className="forum-replying-to" role="status">
+              Respondendo a <strong>{replyingTo.author?.username ?? "Participante"}</strong>
+              <button type="button" onClick={() => setReplyingTo(null)}>
+                cancelar
+              </button>
+            </div>
+          )}
           <textarea
             id="reply-content"
             rows={5}

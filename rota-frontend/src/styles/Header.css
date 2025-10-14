@@ -422,6 +422,7 @@
 /* Botão compacto com avatar + nome, alinhado às ações do header */
 .user-menu {
   position: relative;
+  z-index: 1500;
 }
 .user-button {
   display: inline-flex;
@@ -455,26 +456,33 @@
   box-shadow: 0 8px 20px rgba(0,0,0,.08);
   border-radius: 10px;
   padding: 8px;
-  z-index: 1001;
+  z-index: 1500;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 .user-dropdown a,
 .user-dropdown button.logout-btn {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   width: 100%;
   border: 0;
   background: transparent;
   text-decoration: none;
   color: #1e2132;
   font-size: .95rem;
-  padding: 10px 10px;
-  border-radius: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
   cursor: pointer;
+  position: relative;
+  z-index: 1;
 }
 .user-dropdown a:hover,
 .user-dropdown button.logout-btn:hover {
-  background: #f5f7fa;
-  color: #0365ba;
+  background: transparent;
+  color: inherit;
 }
 
 /* Bloco no mobile drawer */

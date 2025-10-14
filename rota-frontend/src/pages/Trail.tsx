@@ -33,6 +33,7 @@ type ProgressTotal = {
 };
 
 type ItemType = "VIDEO" | "DOC" | "FORM";
+type ResourceKind = "PDF" | "IMAGE" | "OTHER";
 
 type FormOption = {
   id: number;
@@ -74,6 +75,8 @@ type ItemDetail = {
   next_item_id?: number | null;
   form?: FormSchema | null;
   requires_completion?: boolean | null;
+  resource_url?: string | null;
+  resource_kind?: ResourceKind | null;
 };
 
 type FormResult = {
@@ -492,6 +495,8 @@ export default function Trail() {
   const [formError, setFormError] = useState<string | null>(null);
   const [lockedItems, setLockedItems] = useState<Record<number, { id: number; title: string } | null>>({});
   const [blockedBy, setBlockedBy] = useState<{ id: number; title: string } | null>(null);
+  const [certLoading, setCertLoading] = useState(false);
+  const [certError, setCertError] = useState<string | null>(null);
 
   // quais sections estão abertas (expandidas)
   const [openSections, setOpenSections] = useState<Set<number>>(new Set());
@@ -670,6 +675,32 @@ export default function Trail() {
     return new Map(formResult.answers.map((ans) => [ans.question_id, ans]));
   }, [formResult]);
 
+  const handleOpenCertificate = useCallback(async () => {
+    if (!trailId) return;
+    setCertError(null);
+    try {
+      setCertLoading(true);
+      const { data } = await http.get<{
+        certificate_hash?: string;
+      }>(`/certificates/me/trails/${trailId}`);
+      const hash = data?.certificate_hash;
+      if (hash) {
+        navigate(`/certificados/?cert_hash=${hash}`);
+        return;
+      }
+      setCertError("Certificado ainda não disponível. Tente novamente em instantes.");
+    } catch (error: any) {
+      const detail = error?.response?.data?.detail;
+      if (typeof detail === "string" && detail.trim()) {
+        setCertError(detail);
+      } else {
+        setCertError("Não foi possível abrir o certificado agora.");
+      }
+    } finally {
+      setCertLoading(false);
+    }
+  }, [trailId, navigate]);
+
   const handleOptionChange = (questionId: number, optionId: number) => {
     setFormAnswers((prev) => ({
       ...prev,
@@ -824,6 +855,7 @@ export default function Trail() {
         setFormAnswers({});
         setFormResult(null);
         setFormError(null);
+        setCertError(null);
 
         await loadProgress();
       } catch (error) {
@@ -1016,10 +1048,22 @@ export default function Trail() {
                 </button>
               )}
 
-              <button className="btn btn-icon close" onClick={() => navigate(`/trilhas/${trailId}`)}>
-                ✕
-              </button>
+              {progress.status === "COMPLETED" && (
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => { void handleOpenCertificate(); }}
+                  disabled={certLoading}
+                >
+                  {certLoading ? "Abrindo certificado…" : "Ver certificado"}
+                </button>
+              )}
+
             </div>
+            {certError && (
+              <div className="cert-error-inline" role="alert">
+                {certError}
+              </div>
+            )}
 
             {detail.type === "VIDEO" && detail.youtubeId ? (
               <div className="video-wrapper">
@@ -1041,6 +1085,51 @@ export default function Trail() {
                   <p className="video-note">
                     Você pode arrastar a linha do tempo apenas até o ponto já assistido.
                   </p>
+                )}
+              </div>
+            ) : detail.type === "DOC" ? (
+              <div className="doc-viewer">
+                {detail.resource_kind === "PDF" && detail.resource_url ? (
+                  <iframe
+                    className="doc-frame"
+                    src={detail.resource_url.includes("#") ? detail.resource_url : `${detail.resource_url}#toolbar=0`}
+                    title={detail.title || "Pré-visualização do documento"}
+                    loading="lazy"
+                  />
+                ) : detail.resource_kind === "IMAGE" && detail.resource_url ? (
+                  <img
+                    className="doc-image"
+                    src={detail.resource_url}
+                    alt={detail.title || "Pré-visualização da imagem"}
+                    loading="lazy"
+                  />
+                ) : detail.resource_url ? (
+                  <div className="doc-fallback">
+                    <p>Conteúdo disponível no link abaixo.</p>
+                  </div>
+                ) : (
+                  <div className="doc-fallback">
+                    <p>Conteúdo não disponível para este item.</p>
+                  </div>
+                )}
+                {detail.resource_url && (
+                  <div className="doc-actions">
+                    <a
+                      className="btn btn-secondary"
+                      href={detail.resource_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {detail.resource_kind === "PDF"
+                        ? "Abrir PDF em nova guia"
+                        : detail.resource_kind === "IMAGE"
+                        ? "Abrir imagem em nova guia"
+                        : "Abrir recurso em nova guia"}
+                    </a>
+                    <p className="doc-hint">
+                      Caso o visualizador não carregue, abra o recurso em outra guia.
+                    </p>
+                  </div>
                 )}
               </div>
             ) : detail.type === "FORM" && detail.form ? (

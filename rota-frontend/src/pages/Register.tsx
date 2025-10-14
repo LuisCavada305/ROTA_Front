@@ -134,6 +134,7 @@ export default function Register() {
                                     name="sex"
                                     className="form-control with-icon icon-user"
                                     value={sex}
+                                    required
                                     onChange={(e) => setSex(e.target.value as Sex)}
                                 >
                                     <option value="" disabled>Sexo</option>

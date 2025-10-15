@@ -3,9 +3,22 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: calc(100vh - 80px); /* abaixo do header */
+  min-height: calc(100vh - var(--header-height-desktop));
   background: #fff;
-  padding: 20px;
+  padding: 32px 24px;
+}
+
+@media (max-width: 900px) {
+  .login-wrapper {
+    min-height: calc(100vh - var(--header-height-mobile));
+    padding: 24px 20px 32px;
+  }
+}
+
+@media (max-width: 520px) {
+  .login-wrapper {
+    padding: 20px 16px 28px;
+  }
 }
 
 /* Card central com largura máxima */
@@ -15,11 +28,17 @@
   text-align: center;   /* centraliza todo o conteúdo */
 }
 
+@media (max-width: 520px) {
+  .login-card.clean {
+    max-width: 100%;
+  }
+}
+
 /* Logo no topo */
 .login-logo {
   display: block;
   margin: 0 auto 20px;
-  height: 180px;
+  height: clamp(120px, 22vw, 180px);
   width: auto;
 }
 
@@ -29,6 +48,15 @@
   align-items: center;
   justify-content: space-between; /* um em cada lado */
   margin-bottom: 20px;
+}
+
+@media (max-width: 520px) {
+  .form-head {
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    text-align: center;
+  }
 }
 
 .form-head .head-left {
@@ -106,6 +134,15 @@
   justify-content: space-between;
   font-size: 14px;
   margin: 8px 0 16px;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 520px) {
+  .login-aux {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 
 /* Botão */
@@ -169,6 +206,15 @@
   }
 }
 
+@media (max-width: 640px) {
+  .login-error {
+    left: 16px;
+    right: 16px;
+    top: 16px;
+    max-width: none;
+  }
+}
+
 /* SELECT com visual idêntico ao .form-control */
 select.form-control {
   /* reset/seta nativa */
@@ -214,4 +260,3 @@ select.form-control:invalid,
 select.form-control option[disabled] {
   color: #9ca3af;
 }
-

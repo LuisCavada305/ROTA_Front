@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import "../styles/Header.css";
 import LogoRota from "../images/LogoRotaHeader.png";
 import { Home, GraduationCap, Users, MessageSquare, Search, Menu, X, ChevronDown } from "lucide-react";
-import { Link, NavLink } from "react-router-dom";
+import { Link, NavLink, useLocation } from "react-router-dom";
 import Avatar from "../components/Avatar";
 import { useAuth } from "../hooks/useAuth";
 
@@ -11,6 +11,7 @@ export default function Header() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
   const { user, loading, logout } = useAuth();
+  const location = useLocation();
 
   const closeMobile = () => setMobileOpen(false);
 
@@ -25,6 +26,35 @@ export default function Header() {
     document.addEventListener("mousedown", onDocClick);
     return () => document.removeEventListener("mousedown", onDocClick);
   }, []);
+
+  // Fecha menus no escape + fecha drawer quando a rota muda
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setMobileOpen(false);
+        setUserMenuOpen(false);
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  useEffect(() => {
+    setMobileOpen(false);
+    setUserMenuOpen(false);
+  }, [location.pathname]);
+
+  // Evita scroll de fundo com drawer aberto
+  useEffect(() => {
+    if (mobileOpen) {
+      document.body.classList.add("no-scroll");
+    } else {
+      document.body.classList.remove("no-scroll");
+    }
+    return () => {
+      document.body.classList.remove("no-scroll");
+    };
+  }, [mobileOpen]);
 
   return (
     <header id="masthead" className="site-header">

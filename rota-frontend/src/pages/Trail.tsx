@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Menu as MenuIcon, X } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { http } from "../lib/http";
 import "../styles/Trail.css";
@@ -480,6 +481,11 @@ export default function Trail() {
   const { user } = useAuth();
 
   const [sections, setSections] = useState<Section[]>([]);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [isMobileView, setIsMobileView] = useState(
+    () => (typeof window !== "undefined" ? window.innerWidth < 1024 : false)
+  );
   const [progress, setProgress] = useState<ProgressTotal | null>(null);
   const [detail, setDetail] = useState<ItemDetail | null>(null);
   const [watch, setWatch] = useState({ current: 0, duration: 0 });
@@ -502,6 +508,46 @@ export default function Trail() {
   const [openSections, setOpenSections] = useState<Set<number>>(new Set());
 
   const isPrivileged = user?.role === "Admin" || user?.role === "Manager";
+
+  useEffect(() => {
+    function handleResize() {
+      const mobile = window.innerWidth < 1024;
+      setIsMobileView(mobile);
+      if (!mobile) {
+        setSidebarOpen(false);
+      }
+    }
+    if (typeof window !== "undefined") {
+      handleResize();
+      window.addEventListener("resize", handleResize);
+      return () => window.removeEventListener("resize", handleResize);
+    }
+    return undefined;
+  }, []);
+
+  useEffect(() => {
+    if (isMobileView) {
+      setSidebarCollapsed(false);
+    }
+  }, [isMobileView]);
+
+  useEffect(() => {
+    if (isMobileView) {
+      setSidebarOpen(false);
+    }
+  }, [itemId, isMobileView]);
+
+  useEffect(() => {
+    if (!isMobileView) return;
+    if (sidebarOpen) {
+      document.body.classList.add("no-scroll");
+    } else {
+      document.body.classList.remove("no-scroll");
+    }
+    return () => {
+      document.body.classList.remove("no-scroll");
+    };
+  }, [sidebarOpen, isMobileView]);
 
   const loadProgress = useCallback(async () => {
     if (!trailId) return;
@@ -612,6 +658,28 @@ export default function Trail() {
       return next;
     });
   }
+
+  const handleSidebarToggle = () => {
+    if (isMobileView) {
+      setSidebarOpen((prev) => !prev);
+    } else {
+      setSidebarCollapsed((prev) => !prev);
+    }
+  };
+
+  const handleSidebarClose = () => {
+    if (isMobileView) {
+      setSidebarOpen(false);
+    } else {
+      setSidebarCollapsed(true);
+    }
+  };
+
+  const handleSidebarItemClick = () => {
+    if (isMobileView) {
+      setSidebarOpen(false);
+    }
+  };
 
   function resolveIconClass(type?: string | null) {
     if (type === "QUIZ") return "tutor-icon-quiz-o";
@@ -895,11 +963,19 @@ export default function Trail() {
 
   return (
     <Layout>
-    <div className="lesson-page">
+    <div className={`lesson-page${sidebarOpen ? " sidebar-open" : ""}${sidebarCollapsed ? " sidebar-collapsed" : ""}`}>
       {/* Sidebar */}
       <aside className="lesson-sidebar">
         <div className="sidebar-header">
           <span className="sidebar-title">Conteúdo do curso</span>
+          <button
+            type="button"
+            className="sidebar-close-btn"
+            onClick={handleSidebarClose}
+            aria-label={isMobileView ? "Fechar menu de conteúdo" : sidebarCollapsed ? "Mostrar menu de conteúdo" : "Esconder menu de conteúdo"}
+          >
+            <X size={18} />
+          </button>
         </div>
 
 {sections.map((s) => {
@@ -950,6 +1026,7 @@ export default function Trail() {
               className={`topic-item ${isCurrent ? "is-active" : ""} ${isDone ? "is-done" : ""} ${isLocked ? "is-locked" : ""}`}
               title={lockHint}
               aria-disabled={isLocked}
+              onClick={handleSidebarItemClick}
             >
               <div className="left">
                 <span className={`item-icon ${resolveIconClass(i.type)}`} />
@@ -972,12 +1049,30 @@ export default function Trail() {
       </div>
     </div>
   );
-})}
+})} 
 
       </aside>
+      <div
+        className={`lesson-sidebar-overlay${sidebarOpen ? " open" : ""}`}
+        onClick={handleSidebarClose}
+        role="presentation"
+      />
 
       {/* Main */}
       <main className="lesson-main">
+        <button
+          type="button"
+          className="sidebar-toggle-btn"
+          onClick={handleSidebarToggle}
+          aria-expanded={isMobileView ? sidebarOpen : !sidebarCollapsed}
+        >
+          {isMobileView && sidebarOpen ? <X size={18} /> : <MenuIcon size={18} />}
+          <span>
+            {isMobileView
+              ? sidebarOpen ? "Fechar menu" : "Conteúdo"
+              : sidebarCollapsed ? "Mostrar menu" : "Esconder menu"}
+          </span>
+        </button>
         {blockedBy ? (
           <div className="lesson-locked" role="alert">
             <h2>Conteúdo bloqueado</h2>

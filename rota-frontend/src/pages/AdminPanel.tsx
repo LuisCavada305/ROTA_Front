@@ -38,6 +38,32 @@ type DashboardData = {
 
 type ItemTypeOption = { code: string; label: string };
 
+type DraftFormOption = {
+  id: string;
+  text: string;
+  isCorrect: boolean;
+  order: number;
+};
+
+type DraftQuestionType = "ESSAY" | "TRUE_OR_FALSE" | "SINGLE_CHOICE";
+
+type DraftFormQuestion = {
+  id: string;
+  prompt: string;
+  type: DraftQuestionType;
+  required: boolean;
+  points: string;
+  options: DraftFormOption[];
+};
+
+type DraftForm = {
+  title: string;
+  description: string;
+  minScore: string;
+  randomize: boolean;
+  questions: DraftFormQuestion[];
+};
+
 type DraftItem = {
   id: string;
   title: string;
@@ -45,6 +71,7 @@ type DraftItem = {
   content: string;
   duration: string;
   requiresCompletion: boolean;
+  form?: DraftForm;
 };
 
 type DraftSection = {
@@ -57,6 +84,12 @@ const DEFAULT_ITEM_TYPES: ItemTypeOption[] = [
   { code: "VIDEO", label: "Vídeo" },
   { code: "DOC", label: "Documento" },
   { code: "FORM", label: "Formulário" },
+];
+
+const DEFAULT_QUESTION_TYPES: ItemTypeOption[] = [
+  { code: "ESSAY", label: "Dissertativa" },
+  { code: "TRUE_OR_FALSE", label: "Verdadeiro ou falso" },
+  { code: "SINGLE_CHOICE", label: "Múltipla escolha" },
 ];
 
 function randomId(): string {
@@ -91,6 +124,82 @@ function createEmptySection(): DraftSection {
   };
 }
 
+function createDefaultOptionsFor(type: DraftQuestionType): DraftFormOption[] {
+  if (type === "TRUE_OR_FALSE") {
+    return [
+      { id: randomId(), text: "Verdadeiro", isCorrect: true, order: 0 },
+      { id: randomId(), text: "Falso", isCorrect: false, order: 1 },
+    ];
+  }
+  if (type === "SINGLE_CHOICE") {
+    return [
+      { id: randomId(), text: "Opção 1", isCorrect: true, order: 0 },
+      { id: randomId(), text: "Opção 2", isCorrect: false, order: 1 },
+    ];
+  }
+  return [];
+}
+
+function createEmptyQuestion(type: DraftQuestionType, order: number): DraftFormQuestion {
+  return {
+    id: randomId(),
+    prompt: "",
+    type,
+    required: true,
+    points: "1",
+    options: createDefaultOptionsFor(type).map((option, index) => ({
+      ...option,
+      order: index,
+    })),
+  };
+}
+
+function ensureQuestionOptions(question: DraftFormQuestion): DraftFormQuestion {
+  if (question.type === "ESSAY") {
+    return { ...question, options: [] };
+  }
+  let options = question.options.map((option, index) => ({
+    ...option,
+    order: index,
+  }));
+  if (!options.length) {
+    options = createDefaultOptionsFor(question.type).map((option, index) => ({
+      ...option,
+      order: index,
+    }));
+  }
+  if (question.type === "TRUE_OR_FALSE") {
+    const base = createDefaultOptionsFor("TRUE_OR_FALSE");
+    options = base.map((option, index) => {
+      const existing = question.options[index];
+      return {
+        ...option,
+        id: existing?.id ?? option.id,
+        isCorrect: index === 0 ? existing?.isCorrect ?? true : existing?.isCorrect ?? false,
+        order: index,
+      };
+    });
+  }
+  return { ...question, options };
+}
+
+function createDefaultForm(): DraftForm {
+  return {
+    title: "",
+    description: "",
+    minScore: "70",
+    randomize: false,
+    questions: [createEmptyQuestion("SINGLE_CHOICE", 0)],
+  };
+}
+
+function parseNumericInput(value: string, fallback: number): number {
+  if (!value) return fallback;
+  const normalized = value.replace(/,/g, ".");
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 export default function AdminPanel() {
   const { user, loading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState<"dashboard" | "builder">("dashboard");
@@ -101,6 +210,7 @@ export default function AdminPanel() {
   const [dashboardError, setDashboardError] = useState<string | null>(null);
 
   const [itemTypes, setItemTypes] = useState<ItemTypeOption[]>([]);
+  const [questionTypes, setQuestionTypes] = useState<ItemTypeOption[]>([]);
 
   const [name, setName] = useState("");
   const [thumbnailUrl, setThumbnailUrl] = useState("");
@@ -115,6 +225,10 @@ export default function AdminPanel() {
   const availableItemTypes = useMemo(
     () => (itemTypes.length ? itemTypes : DEFAULT_ITEM_TYPES),
     [itemTypes]
+  );
+  const availableQuestionTypes = useMemo(
+    () => (questionTypes.length ? questionTypes : DEFAULT_QUESTION_TYPES),
+    [questionTypes]
   );
 
   useEffect(() => {
@@ -132,7 +246,20 @@ export default function AdminPanel() {
         }
       }
     };
+    const loadQuestionTypes = async () => {
+      try {
+        const { data } = await http.get<{ question_types: ItemTypeOption[] }>("/admin/forms/question-types");
+        if (!cancelled) {
+          setQuestionTypes(data.question_types ?? []);
+        }
+      } catch {
+        if (!cancelled) {
+          setQuestionTypes([]);
+        }
+      }
+    };
     void loadItemTypes();
+    void loadQuestionTypes();
     return () => {
       cancelled = true;
     };
@@ -219,6 +346,7 @@ export default function AdminPanel() {
                   content: "",
                   duration: "",
                   requiresCompletion: false,
+                  form: defaultType === "FORM" ? createDefaultForm() : undefined,
                 },
               ],
             }
@@ -261,12 +389,218 @@ export default function AdminPanel() {
     setSections((prev) =>
       prev.map((section) => {
         if (section.id !== sectionId) return section;
-        const nextItems = section.items.map((item) =>
-          item.id === itemId ? { ...item, ...patch } : item
-        );
+        const nextItems = section.items.map((item) => {
+          if (item.id !== itemId) return item;
+          const nextType = patch.type ?? item.type;
+          const ensureForm =
+            nextType === "FORM"
+              ? item.form ?? createDefaultForm()
+              : undefined;
+          const merged: DraftItem = {
+            ...item,
+            ...patch,
+            form: ensureForm,
+          };
+          if (merged.form && merged.type === "FORM") {
+            merged.form = {
+              ...merged.form,
+              questions: merged.form.questions.map((question, index) => {
+                const ensured = ensureQuestionOptions(question);
+                return {
+                  ...ensured,
+                  points: ensured.points || "1",
+                };
+              }),
+            };
+          }
+          return merged;
+        });
         return { ...section, items: nextItems };
       })
     );
+  };
+
+  const setFormState = (
+    sectionId: string,
+    itemId: string,
+    updater: (form: DraftForm) => DraftForm
+  ) => {
+    setSections((prev) =>
+      prev.map((section) => {
+        if (section.id !== sectionId) return section;
+        const nextItems = section.items.map((item) => {
+          if (item.id !== itemId) return item;
+          if (item.type !== "FORM" || !item.form) return item;
+          const nextForm = updater(item.form);
+          const ensuredQuestions = (
+            nextForm.questions.length ? nextForm.questions : [createEmptyQuestion("SINGLE_CHOICE", 0)]
+          ).map((question) => ensureQuestionOptions(question));
+          return {
+            ...item,
+            form: {
+              ...nextForm,
+              questions: ensuredQuestions,
+            },
+          };
+        });
+        return { ...section, items: nextItems };
+      })
+    );
+  };
+
+  const updateFormMeta = (
+    sectionId: string,
+    itemId: string,
+    patch: Partial<Omit<DraftForm, "questions">>
+  ) => {
+    setFormState(sectionId, itemId, (form) => ({ ...form, ...patch }));
+  };
+
+  const addQuestion = (sectionId: string, itemId: string, type: DraftQuestionType) => {
+    setFormState(sectionId, itemId, (form) => ({
+      ...form,
+      questions: [...form.questions, createEmptyQuestion(type, form.questions.length)],
+    }));
+  };
+
+  const removeQuestion = (sectionId: string, itemId: string, questionId: string) => {
+    setFormState(sectionId, itemId, (form) => ({
+      ...form,
+      questions: form.questions.filter((question) => question.id !== questionId),
+    }));
+  };
+
+  const moveQuestion = (
+    sectionId: string,
+    itemId: string,
+    questionId: string,
+    direction: -1 | 1
+  ) => {
+    setFormState(sectionId, itemId, (form) => {
+      const index = form.questions.findIndex((question) => question.id === questionId);
+      if (index < 0) return form;
+      const targetIndex = index + direction;
+      if (targetIndex < 0 || targetIndex >= form.questions.length) return form;
+      const nextQuestions = [...form.questions];
+      const [current] = nextQuestions.splice(index, 1);
+      nextQuestions.splice(targetIndex, 0, current);
+      return { ...form, questions: nextQuestions };
+    });
+  };
+
+  const updateQuestion = (
+    sectionId: string,
+    itemId: string,
+    questionId: string,
+    patch: Partial<Omit<DraftFormQuestion, "id" | "options">> & { options?: DraftFormOption[] }
+  ) => {
+    setFormState(sectionId, itemId, (form) => ({
+      ...form,
+      questions: form.questions.map((question) => {
+        if (question.id !== questionId) return question;
+        const nextType = (patch.type ?? question.type) as DraftQuestionType;
+        const base: DraftFormQuestion = {
+          ...question,
+          ...patch,
+          type: nextType,
+        };
+        return ensureQuestionOptions(base);
+      }),
+    }));
+  };
+
+  const addOption = (sectionId: string, itemId: string, questionId: string) => {
+    setFormState(sectionId, itemId, (form) => ({
+      ...form,
+      questions: form.questions.map((question) => {
+        if (question.id !== questionId) return question;
+        if (question.type === "ESSAY" || question.type === "TRUE_OR_FALSE") return question;
+        const nextOptions = [
+          ...question.options,
+          { id: randomId(), text: `Opção ${question.options.length + 1}`, isCorrect: false, order: question.options.length },
+        ];
+        return { ...question, options: nextOptions };
+      }),
+    }));
+  };
+
+  const moveOption = (
+    sectionId: string,
+    itemId: string,
+    questionId: string,
+    optionId: string,
+    direction: -1 | 1
+  ) => {
+    setFormState(sectionId, itemId, (form) => ({
+      ...form,
+      questions: form.questions.map((question) => {
+        if (question.id !== questionId) return question;
+        if (question.type === "ESSAY" || question.type === "TRUE_OR_FALSE") return question;
+        const index = question.options.findIndex((option) => option.id === optionId);
+        if (index < 0) return question;
+        const targetIndex = index + direction;
+        if (targetIndex < 0 || targetIndex >= question.options.length) return question;
+        const nextOptions = [...question.options];
+        const [current] = nextOptions.splice(index, 1);
+        nextOptions.splice(targetIndex, 0, current);
+        return { ...question, options: nextOptions };
+      }),
+    }));
+  };
+
+  const removeOption = (
+    sectionId: string,
+    itemId: string,
+    questionId: string,
+    optionId: string
+  ) => {
+    setFormState(sectionId, itemId, (form) => ({
+      ...form,
+      questions: form.questions.map((question) => {
+        if (question.id !== questionId) return question;
+        const filtered = question.options.filter((option) => option.id !== optionId);
+        return ensureQuestionOptions({ ...question, options: filtered });
+      }),
+    }));
+  };
+
+  const updateOption = (
+    sectionId: string,
+    itemId: string,
+    questionId: string,
+    optionId: string,
+    patch: Partial<Omit<DraftFormOption, "id" | "order">>
+  ) => {
+    setFormState(sectionId, itemId, (form) => ({
+      ...form,
+      questions: form.questions.map((question) => {
+        if (question.id !== questionId) return question;
+        const nextOptions = question.options.map((option) =>
+          option.id === optionId ? { ...option, ...patch } : option
+        );
+        return { ...question, options: nextOptions };
+      }),
+    }));
+  };
+
+  const setCorrectOption = (
+    sectionId: string,
+    itemId: string,
+    questionId: string,
+    optionId: string
+  ) => {
+    setFormState(sectionId, itemId, (form) => ({
+      ...form,
+      questions: form.questions.map((question) => {
+        if (question.id !== questionId) return question;
+        if (question.type === "ESSAY") return question;
+        const nextOptions = question.options.map((option) => ({
+          ...option,
+          isCorrect: option.id === optionId,
+        }));
+        return { ...question, options: nextOptions };
+      }),
+    }));
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -320,6 +654,55 @@ export default function AdminPanel() {
             return;
           }
         }
+        if (item.type === "FORM") {
+          const form = item.form;
+          if (!form) {
+            setSaveError(`Configure o formulário do item ${itemIndex + 1} na seção ${sectionIndex + 1}.`);
+            return;
+          }
+          const minScoreValue = parseNumericInput(form.minScore, 70);
+          if (!Number.isFinite(minScoreValue) || minScoreValue < 0) {
+            setSaveError(`Informe uma nota mínima válida no formulário da seção ${sectionIndex + 1}.`);
+            return;
+          }
+          if (!form.questions.length) {
+            setSaveError(`Adicione pelo menos uma pergunta ao formulário na seção ${sectionIndex + 1}.`);
+            return;
+          }
+          for (let questionIndex = 0; questionIndex < form.questions.length; questionIndex += 1) {
+            const question = form.questions[questionIndex];
+            const prompt = question.prompt.trim();
+            if (!prompt) {
+              setSaveError(`Informe o enunciado da pergunta ${questionIndex + 1} no formulário da seção ${sectionIndex + 1}.`);
+              return;
+            }
+            const pointsValue = parseNumericInput(question.points, 0);
+            if (!Number.isFinite(pointsValue) || pointsValue < 0) {
+              setSaveError(`Informe um valor de pontos válido na pergunta ${questionIndex + 1}.`);
+              return;
+            }
+            if (question.type !== "ESSAY") {
+              if (!question.options.length) {
+                setSaveError(`Adicione alternativas para a pergunta ${questionIndex + 1}.`);
+                return;
+              }
+              const trimmedOptions = question.options.map((option) => option.text.trim());
+              if (trimmedOptions.some((text) => !text)) {
+                setSaveError(`Preencha o texto de todas as alternativas na pergunta ${questionIndex + 1}.`);
+                return;
+              }
+              const correctCount = question.options.filter((option) => option.isCorrect).length;
+              if (correctCount === 0) {
+                setSaveError(`Escolha uma alternativa correta na pergunta ${questionIndex + 1}.`);
+                return;
+              }
+              if (question.type === "TRUE_OR_FALSE" && question.options.length !== 2) {
+                setSaveError(`A pergunta ${questionIndex + 1} deve possuir duas alternativas (verdadeiro/falso).`);
+                return;
+              }
+            }
+          }
+        }
       }
     }
 
@@ -338,6 +721,30 @@ export default function AdminPanel() {
           duration_seconds: item.duration ? Number(item.duration) : null,
           requires_completion: item.requiresCompletion,
           order_index: itemIndex,
+          form:
+            item.type === "FORM" && item.form
+              ? {
+                  title: item.form.title.trim() || null,
+                  description: item.form.description.trim() || null,
+                  min_score_to_pass: parseNumericInput(item.form.minScore, 70),
+                  randomize_questions: item.form.randomize,
+                  questions: item.form.questions.map((question, questionIndex) => ({
+                    prompt: question.prompt.trim(),
+                    type: question.type,
+                    required: question.required,
+                    points: parseNumericInput(question.points, 0),
+                    order_index: questionIndex,
+                    options:
+                      question.type === "ESSAY"
+                        ? []
+                        : question.options.map((option, optionIndex) => ({
+                            text: option.text.trim(),
+                            is_correct: option.isCorrect,
+                            order_index: optionIndex,
+                          })),
+                  })),
+                }
+              : undefined,
         })),
       })),
     };
@@ -723,6 +1130,233 @@ export default function AdminPanel() {
                               <span>Item obrigatório</span>
                             </label>
                           </div>
+                          {item.type === "FORM" && item.form ? (
+                            <div className="admin-form-builder">
+                              <div className="admin-form-meta">
+                                <label>
+                                  <span>Título do formulário</span>
+                                  <input
+                                    type="text"
+                                    value={item.form.title}
+                                    onChange={(event) =>
+                                      updateFormMeta(section.id, item.id, { title: event.target.value })
+                                    }
+                                    placeholder="Nome exibido no formulário"
+                                  />
+                                </label>
+                                <label className="full">
+                                  <span>Descrição</span>
+                                  <textarea
+                                    value={item.form.description}
+                                    onChange={(event) =>
+                                      updateFormMeta(section.id, item.id, { description: event.target.value })
+                                    }
+                                    placeholder="Instruções para os participantes"
+                                  ></textarea>
+                                </label>
+                                <label>
+                                  <span>Nota mínima para aprovação</span>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    step={0.5}
+                                    value={item.form.minScore}
+                                    onChange={(event) =>
+                                      updateFormMeta(section.id, item.id, { minScore: event.target.value })
+                                    }
+                                  />
+                                </label>
+                                <label className="checkbox-inline">
+                                  <input
+                                    type="checkbox"
+                                    checked={item.form.randomize}
+                                    onChange={(event) =>
+                                      updateFormMeta(section.id, item.id, { randomize: event.target.checked })
+                                    }
+                                  />
+                                  <span>Embaralhar ordem das perguntas</span>
+                                </label>
+                              </div>
+
+                              <div className="admin-question-list">
+                                {item.form.questions.map((question, questionIndex) => (
+                                  <div className="admin-question-card" key={question.id}>
+                                    <div className="admin-question-header">
+                                      <div>
+                                        <h4>Pergunta {questionIndex + 1}</h4>
+                                      </div>
+                                      <div className="admin-question-actions">
+                                        <button
+                                          type="button"
+                                          className="icon-btn"
+                                          onClick={() => moveQuestion(section.id, item.id, question.id, -1)}
+                                          disabled={questionIndex === 0}
+                                          aria-label="Mover pergunta para cima"
+                                        >
+                                          <ArrowUp size={16} />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className="icon-btn"
+                                          onClick={() => moveQuestion(section.id, item.id, question.id, 1)}
+                                          disabled={questionIndex === item.form.questions.length - 1}
+                                          aria-label="Mover pergunta para baixo"
+                                        >
+                                          <ArrowDown size={16} />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className="icon-btn danger"
+                                          onClick={() => removeQuestion(section.id, item.id, question.id)}
+                                          aria-label="Remover pergunta"
+                                          disabled={item.form.questions.length <= 1}
+                                        >
+                                          <Trash2 size={16} />
+                                        </button>
+                                      </div>
+                                    </div>
+
+                                    <div className="admin-question-grid">
+                                      <label className="full">
+                                        <span>Enunciado</span>
+                                        <textarea
+                                          value={question.prompt}
+                                          onChange={(event) =>
+                                            updateQuestion(section.id, item.id, question.id, {
+                                              prompt: event.target.value,
+                                            })
+                                          }
+                                          placeholder="Digite a pergunta"
+                                        ></textarea>
+                                      </label>
+                                      <label>
+                                        <span>Tipo</span>
+                                        <select
+                                          value={question.type}
+                                          onChange={(event) =>
+                                            updateQuestion(section.id, item.id, question.id, {
+                                              type: event.target.value as DraftQuestionType,
+                                            })
+                                          }
+                                        >
+                                          {availableQuestionTypes.map((option) => (
+                                            <option key={option.code} value={option.code}>
+                                              {option.label}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      </label>
+                                      <label>
+                                        <span>Valor (pontos)</span>
+                                        <input
+                                          type="number"
+                                          min={0}
+                                          step={0.5}
+                                          value={question.points}
+                                          onChange={(event) =>
+                                            updateQuestion(section.id, item.id, question.id, {
+                                              points: event.target.value,
+                                            })
+                                          }
+                                        />
+                                      </label>
+                                      <label className="checkbox-inline">
+                                        <input
+                                          type="checkbox"
+                                          checked={question.required}
+                                          onChange={(event) =>
+                                            updateQuestion(section.id, item.id, question.id, {
+                                              required: event.target.checked,
+                                            })
+                                          }
+                                        />
+                                        <span>Pergunta obrigatória</span>
+                                      </label>
+                                    </div>
+
+                                    {question.type !== "ESSAY" ? (
+                                      <div className="admin-option-list">
+                                        {question.options.map((option, optionIndex) => (
+                                          <div className="admin-option-row" key={option.id}>
+                                            <label className="radio">
+                                              <input
+                                                type="radio"
+                                                name={`correct-${question.id}`}
+                                                checked={option.isCorrect}
+                                                onChange={() => setCorrectOption(section.id, item.id, question.id, option.id)}
+                                              />
+                                              <span>Correta</span>
+                                            </label>
+                                            <input
+                                              type="text"
+                                              value={option.text}
+                                              onChange={(event) =>
+                                                updateOption(section.id, item.id, question.id, option.id, {
+                                                  text: event.target.value,
+                                                })
+                                              }
+                                              placeholder={`Alternativa ${optionIndex + 1}`}
+                                              disabled={question.type === "TRUE_OR_FALSE"}
+                                            />
+                                            <div className="admin-option-actions">
+                                              {question.type === "SINGLE_CHOICE" ? (
+                                                <>
+                                                  <button
+                                                    type="button"
+                                                    className="icon-btn"
+                                                    onClick={() => moveOption(section.id, item.id, question.id, option.id, -1)}
+                                                    disabled={optionIndex === 0}
+                                                    aria-label="Mover alternativa para cima"
+                                                  >
+                                                    <ArrowUp size={14} />
+                                                  </button>
+                                                  <button
+                                                    type="button"
+                                                    className="icon-btn"
+                                                    onClick={() => moveOption(section.id, item.id, question.id, option.id, 1)}
+                                                    disabled={optionIndex === question.options.length - 1}
+                                                    aria-label="Mover alternativa para baixo"
+                                                  >
+                                                    <ArrowDown size={14} />
+                                                  </button>
+                                                  <button
+                                                    type="button"
+                                                    className="icon-btn danger"
+                                                    onClick={() => removeOption(section.id, item.id, question.id, option.id)}
+                                                    aria-label="Remover alternativa"
+                                                    disabled={question.options.length <= 2}
+                                                  >
+                                                    <Trash2 size={14} />
+                                                  </button>
+                                                </>
+                                              ) : null}
+                                            </div>
+                                          </div>
+                                        ))}
+                                        {question.type === "SINGLE_CHOICE" ? (
+                                          <button
+                                            type="button"
+                                            className="admin-btn admin-btn-ghost"
+                                            onClick={() => addOption(section.id, item.id, question.id)}
+                                          >
+                                            <Plus size={14} /> Adicionar alternativa
+                                          </button>
+                                        ) : null}
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                ))}
+
+                                <button
+                                  type="button"
+                                  className="admin-btn admin-btn-secondary"
+                                  onClick={() => addQuestion(section.id, item.id, "SINGLE_CHOICE")}
+                                >
+                                  <Plus size={16} /> Nova pergunta
+                                </button>
+                              </div>
+                            </div>
+                          ) : null}
                           <div className="admin-item-actions">
                             <button
                               type="button"

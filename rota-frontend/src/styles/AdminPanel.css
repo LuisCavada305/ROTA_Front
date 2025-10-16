@@ -316,6 +316,149 @@
   gap: 12px;
 }
 
+.admin-form-builder {
+  border-top: 1px dashed #cbd5e1;
+  padding-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.admin-form-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.admin-form-meta label,
+.admin-question-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: #1e293b;
+}
+
+.admin-form-meta input,
+.admin-form-meta textarea,
+.admin-question-grid input,
+.admin-question-grid select,
+.admin-question-grid textarea {
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  background: #fff;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.admin-form-meta input:focus,
+.admin-form-meta textarea:focus,
+.admin-question-grid input:focus,
+.admin-question-grid select:focus,
+.admin-question-grid textarea:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
+  outline: none;
+}
+
+.admin-form-meta label.full,
+.admin-question-grid label.full {
+  grid-column: 1 / -1;
+}
+
+.admin-form-meta textarea,
+.admin-question-grid textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.checkbox-inline,
+.radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #1e293b;
+}
+
+.admin-question-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.admin-question-card {
+  background: #fff;
+  border: 1px solid #dbe3f5;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.admin-question-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.admin-question-header h4 {
+  margin: 0;
+  font-size: 15px;
+  color: #0f172a;
+}
+
+.admin-question-actions {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.admin-question-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.admin-option-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-option-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: center;
+  background: #f1f5f9;
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.admin-option-row input[type="text"] {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 14px;
+  background: #fff;
+}
+
+.admin-option-actions {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.admin-option-actions .icon-btn {
+  width: 28px;
+  height: 28px;
+}
+
 .admin-item-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));

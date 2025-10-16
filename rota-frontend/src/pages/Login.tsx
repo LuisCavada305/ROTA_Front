@@ -29,7 +29,28 @@ export default function Login() {
       window.location.href = "/"; // redireciona para a home
     } catch (error) {
       if (axios.isAxiosError(error)) {
-        setErr((error.response?.data as any)?.detail || "Falha no login");
+        const status = error.response?.status;
+        let message: string | null = null;
+        const dataDetail = (error.response?.data as any)?.detail;
+
+        if (typeof dataDetail === "string" && dataDetail.trim()) {
+          message = dataDetail;
+        } else if (Array.isArray(dataDetail) && dataDetail.length) {
+          const first = dataDetail[0];
+          if (typeof first?.msg === "string") {
+            message = first.msg;
+          }
+        }
+
+        if (status === 401) {
+          message = message ?? "Credenciais inválidas. Verifique seu email e senha.";
+        } else if (status === 429) {
+          const retryAfter = error.response?.headers?.["retry-after"];
+          const suffix = retryAfter ? ` Aguarde ${retryAfter} segundos.` : "";
+          message = `Muitas tentativas. Tente novamente em instantes.${suffix}`;
+        }
+
+        setErr(message ?? `Falha no login${status ? ` (código ${status})` : ""}.`);
       } else {
         setErr("Erro inesperado. Tente novamente.");
       }

@@ -11,6 +11,7 @@ import Trail from "./pages/Trail";
 import Certificate from "./pages/Certificate";
 import UserPanel from "./pages/UserPanel";
 import Profile from "./pages/Profile";
+import AdminPanel from "./pages/AdminPanel";
 
 
 
@@ -29,6 +30,7 @@ export default function App() {
         <Route path="/foruns/*" element={<Forum />} />
         <Route path="/painel" element={<UserPanel />} />
         <Route path="/perfil" element={<Profile />} />
+        <Route path="/admin" element={<AdminPanel />} />
         {/* <Route path="/membros" element={<Members />} /> */}
       </Routes>
     </>

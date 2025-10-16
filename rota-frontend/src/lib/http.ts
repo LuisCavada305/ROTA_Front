@@ -112,13 +112,17 @@ http.interceptors.response.use(
   (err: AxiosError) => {
     const status = err.response?.status ?? 0;
     const cfg = err.config as InternalAxiosRequestConfig | undefined;
+    const path = cfg?.url ?? "";
 
     const isUnauthorizedLike = status === 409 || status === 401 || status === 403;
+    const isAuthFlowRequest =
+      typeof path === "string" &&
+      (path.includes("/auth/login") || path.includes("/auth/register"));
 
-    if (isUnauthorizedLike && !cfg?.suppressAuthModal) {
+    if (isUnauthorizedLike && !cfg?.suppressAuthModal && !isAuthFlowRequest) {
       window.dispatchEvent(
         new CustomEvent("auth:unauthorized", {
-          detail: { status, path: cfg?.url ?? "" },
+          detail: { status, path },
         })
       );
     }

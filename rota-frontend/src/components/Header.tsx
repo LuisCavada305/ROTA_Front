@@ -12,6 +12,7 @@ export default function Header() {
   const userMenuRef = useRef<HTMLDivElement | null>(null);
   const { user, loading, logout } = useAuth();
   const location = useLocation();
+  const isAdmin = user?.role === "Admin";
 
   const closeMobile = () => setMobileOpen(false);
 
@@ -139,7 +140,9 @@ export default function Header() {
                 <div className="user-dropdown" role="menu">
                   <NavLink to="/painel" onClick={() => setUserMenuOpen(false)} role="menuitem">Painel</NavLink>
                   <NavLink to="/perfil" onClick={() => setUserMenuOpen(false)} role="menuitem">Perfil</NavLink>
-                  <NavLink to="/conta"  onClick={() => setUserMenuOpen(false)} role="menuitem">Conta</NavLink>
+                  {isAdmin ? (
+                    <NavLink to="/admin" onClick={() => setUserMenuOpen(false)} role="menuitem">Admin</NavLink>
+                  ) : null}
                   <button type="button" onClick={logout} className="logout-btn" role="menuitem">Sair</button>
                 </div>
               )}
@@ -179,7 +182,7 @@ export default function Header() {
               </div>
               <NavLink to="/painel" onClick={closeMobile}>Painel</NavLink>
               <NavLink to="/perfil" onClick={closeMobile}>Perfil</NavLink>
-              <NavLink to="/conta"  onClick={closeMobile}>Conta</NavLink>
+              {isAdmin ? <NavLink to="/admin" onClick={closeMobile}>Admin</NavLink> : null}
               <button type="button" onClick={() => { logout(); closeMobile(); }} className="logout-btn">Sair</button>
             </div>
           ) : (

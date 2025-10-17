@@ -268,7 +268,7 @@ export default function AdminPanel() {
   useEffect(() => {
     if (authLoading || !isAdmin) return;
     if (activeTab !== "dashboard") return;
-    if (dashboardLoading || dashboardLoaded) return;
+    if (dashboardLoaded) return;
     let cancelled = false;
     const loadDashboard = async () => {
       setDashboardLoading(true);
@@ -291,7 +291,7 @@ export default function AdminPanel() {
     return () => {
       cancelled = true;
     };
-  }, [activeTab, authLoading, dashboardLoaded, dashboardLoading, isAdmin]);
+  }, [activeTab, authLoading, dashboardLoaded, isAdmin]);
 
   const resetBuilder = () => {
     setName("");

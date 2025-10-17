@@ -119,6 +119,7 @@ function YouTubePlayer({
   onReady,
   maxAllowedPosition,
   seekBlockedLabel,
+  playedSeconds = 0,
 }: {
   videoId: string;
   startAt?: number;
@@ -126,6 +127,7 @@ function YouTubePlayer({
   onReady?: (t: { current: number; duration: number }) => void;
   maxAllowedPosition?: number;
   seekBlockedLabel?: string;
+  playedSeconds?: number;
 }) {
   const surfaceRef = useRef<HTMLDivElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -383,6 +385,10 @@ function YouTubePlayer({
     return `${pad(m)}:${pad(s)}`;
   };
   const pct = duration ? (current / duration) * 100 : 0;
+  const playedPct = duration
+    ? Math.min(100, (Math.max(current, playedSeconds) / duration) * 100)
+    : 0;
+  const progressTrack = `linear-gradient(to right, #2563eb ${playedPct}%, rgba(255,255,255,0.2) ${playedPct}%)`;
   const showOverlay = !isPlaying || hover;
 
   return (
@@ -425,7 +431,7 @@ function YouTubePlayer({
             value={Math.floor(current || 0)}
             onChange={(e) => handleSeek(Number(e.target.value))}
             style={{
-              background: `linear-gradient(to right, rgba(255,255,255,0.95) ${pct}%, rgba(255,255,255,0.25) ${pct}%)`
+              background: progressTrack
             }}
             aria-label="Progresso"
             title={seekBlockedLabel && typeof maxAllowedPosition === "number" ? seekBlockedLabel : undefined}
@@ -497,6 +503,11 @@ export default function Trail() {
   const [itemProgress, setItemProgress] = useState<Record<number, ItemProgress>>({});
   const [sectionProgress, setSectionProgress] = useState<Record<number, SectionProgress>>({});
   const sectionsRef = useRef<Section[]>([]);
+  const lastProgressSyncRef = useRef<number>(0);
+  const prevCanCompleteRef = useRef<boolean>(false);
+  const syncProgressInFlightRef = useRef<boolean>(false);
+  const isMountedRef = useRef<boolean>(true);
+  const resumePositionRef = useRef<number>(0);
   const [formAnswers, setFormAnswers] = useState<Record<number, { selectedOptionId?: number; answerText?: string }>>({});
   const [formSubmitting, setFormSubmitting] = useState(false);
   const [formResult, setFormResult] = useState<FormResult | null>(null);
@@ -510,6 +521,12 @@ export default function Trail() {
   const [openSections, setOpenSections] = useState<Set<number>>(new Set());
 
   const isPrivileged = user?.role === "Admin" || user?.role === "Manager";
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     function handleResize() {
@@ -538,6 +555,12 @@ export default function Trail() {
       setSidebarOpen(false);
     }
   }, [itemId, isMobileView]);
+
+  useEffect(() => {
+    lastProgressSyncRef.current = Date.now();
+    prevCanCompleteRef.current = false;
+    resumePositionRef.current = 0;
+  }, [detail?.id]);
 
   useEffect(() => {
     if (!isMobileView) return;
@@ -727,6 +750,15 @@ export default function Trail() {
     if (!progressEntry) return;
     const stored = progressEntry.progress_value ?? 0;
     if (stored <= 0) return;
+    if (resumePositionRef.current === 0) {
+      const duration = detail.duration_seconds ?? 0;
+      if (duration > 0) {
+        const safeUpperBound = Math.max(0, duration - 1);
+        resumePositionRef.current = Math.max(0, Math.min(stored, safeUpperBound));
+      } else {
+        resumePositionRef.current = Math.max(0, stored);
+      }
+    }
     setMaxWatched((prev) => (stored > prev ? stored : prev));
   }, [detail, itemProgress]);
 
@@ -944,19 +976,40 @@ export default function Trail() {
   // salva progresso periodicamente para reduzir carga no backend
   useEffect(() => {
     if (!detail || detail.type !== "VIDEO") return;
-    const id = window.setTimeout(async () => {
+
+    const previouslyComplete = prevCanCompleteRef.current;
+    const becameComplete = canComplete && !previouslyComplete;
+    prevCanCompleteRef.current = canComplete;
+
+    const now = Date.now();
+    const elapsed = now - lastProgressSyncRef.current;
+    const shouldSync = becameComplete || elapsed >= PROGRESS_SAVE_INTERVAL_MS;
+
+    if (!shouldSync) return;
+    if (syncProgressInFlightRef.current) return;
+
+    syncProgressInFlightRef.current = true;
+    lastProgressSyncRef.current = now;
+
+    (async () => {
       try {
-        setSaving(true);
+        if (isMountedRef.current) {
+          setSaving(true);
+        }
         await http.put(`/trails/${trailId}/items/${detail.id}/progress`, {
           status: canComplete ? "COMPLETED" : "IN_PROGRESS",
           progress_value: Math.floor(watchedSeconds), // segundos assistidos
         });
         await loadProgress();
-      } catch {} finally {
-        setSaving(false);
+      } catch {
+        // noop: manter UX silenciosa
+      } finally {
+        syncProgressInFlightRef.current = false;
+        if (isMountedRef.current) {
+          setSaving(false);
+        }
       }
-    }, PROGRESS_SAVE_INTERVAL_MS);
-    return () => clearTimeout(id);
+    })();
   }, [watchedSeconds, canComplete, trailId, detail, loadProgress]);
 
   if (loading || !progress) {
@@ -1166,10 +1219,11 @@ export default function Trail() {
               <div className="video-wrapper">
                 <YouTubePlayer
                   videoId={detail.youtubeId}
-                  startAt={0}
+                  startAt={resumePositionRef.current}
+                  playedSeconds={Math.max(maxWatched, watch.current, resumePositionRef.current)}
                   onReady={({ current, duration }) => {
                     setWatch({ current, duration });
-                    setMaxWatched(Math.max(0, current));
+                    setMaxWatched((prev) => Math.max(prev, current));
                   }}
                   onProgress={({ current, duration }) => {
                     setWatch({ current, duration });

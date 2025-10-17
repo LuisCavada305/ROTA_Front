@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { ArrowDown, ArrowUp, Loader2, Plus, Trash2 } from "lucide-react";
 import Layout from "../components/Layout";
 import { useAuth } from "../hooks/useAuth";
@@ -33,6 +33,56 @@ type DashboardData = {
     name: string;
     enrollments: number;
     completed: number;
+  }>;
+};
+
+type AdminTrailSummary = {
+  id: number;
+  name: string;
+  author: string | null;
+  created_date: string | null;
+};
+
+type AdminTrailDetail = {
+  id: number;
+  name: string;
+  thumbnail_url: string;
+  description: string;
+  author: string;
+  sections: Array<{
+    id: number;
+    title: string;
+    order_index: number;
+    items: Array<{
+      id: number;
+      title: string;
+      type: string;
+      url: string;
+      duration_seconds: number | null;
+      requires_completion: boolean;
+      order_index: number;
+      form?: {
+        id: number;
+        title: string;
+        description: string;
+        min_score_to_pass: number;
+        randomize_questions: boolean;
+        questions: Array<{
+          id: number;
+          prompt: string;
+          type: string;
+          required: boolean;
+          points: number;
+          order_index: number;
+          options: Array<{
+            id: number;
+            text: string;
+            is_correct: boolean;
+            order_index: number;
+          }>;
+        }>;
+      };
+    }>;
   }>;
 };
 
@@ -200,6 +250,14 @@ function parseNumericInput(value: string, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function toDraftQuestionType(value: string): DraftQuestionType {
+  const normalized = (value || "").toUpperCase();
+  if (normalized === "ESSAY" || normalized === "TRUE_OR_FALSE" || normalized === "SINGLE_CHOICE") {
+    return normalized as DraftQuestionType;
+  }
+  return "SINGLE_CHOICE";
+}
+
 export default function AdminPanel() {
   const { user, loading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState<"dashboard" | "builder">("dashboard");
@@ -212,6 +270,15 @@ export default function AdminPanel() {
   const [itemTypes, setItemTypes] = useState<ItemTypeOption[]>([]);
   const [questionTypes, setQuestionTypes] = useState<ItemTypeOption[]>([]);
 
+  const [existingTrails, setExistingTrails] = useState<AdminTrailSummary[]>([]);
+  const [existingTrailsLoading, setExistingTrailsLoading] = useState(false);
+  const [existingTrailsLoaded, setExistingTrailsLoaded] = useState(false);
+  const [existingTrailsError, setExistingTrailsError] = useState<string | null>(null);
+  const [selectedTrailId, setSelectedTrailId] = useState<string>("");
+  const [editingTrailId, setEditingTrailId] = useState<number | null>(null);
+  const [loadingTrail, setLoadingTrail] = useState(false);
+  const trailsRequestInFlight = useRef(false);
+
   const [name, setName] = useState("");
   const [thumbnailUrl, setThumbnailUrl] = useState("");
   const [author, setAuthor] = useState("");
@@ -220,6 +287,8 @@ export default function AdminPanel() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
+
+  const isEditing = editingTrailId !== null;
 
   const isAdmin = user?.role === "Admin";
   const availableItemTypes = useMemo(
@@ -267,6 +336,41 @@ export default function AdminPanel() {
 
   useEffect(() => {
     if (authLoading || !isAdmin) return;
+    if (activeTab !== "builder") return;
+    if (existingTrailsLoaded || trailsRequestInFlight.current) return;
+    let cancelled = false;
+    const loadTrails = async () => {
+      trailsRequestInFlight.current = true;
+      setExistingTrailsLoading(true);
+      setExistingTrailsError(null);
+      try {
+        const { data } = await http.get<{ trails: AdminTrailSummary[] }>("/admin/trails");
+        if (!cancelled) {
+          setExistingTrails(data.trails ?? []);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setExistingTrails([]);
+          setExistingTrailsError(normalizeError(err));
+        }
+      } finally {
+        if (!cancelled) {
+          setExistingTrailsLoaded(true);
+          setExistingTrailsLoading(false);
+        }
+        trailsRequestInFlight.current = false;
+      }
+    };
+    void loadTrails();
+    return () => {
+      cancelled = true;
+      trailsRequestInFlight.current = false;
+      setExistingTrailsLoading(false);
+    };
+  }, [activeTab, authLoading, existingTrailsLoaded, isAdmin]);
+
+  useEffect(() => {
+    if (authLoading || !isAdmin) return;
     if (activeTab !== "dashboard") return;
     if (dashboardLoaded) return;
     let cancelled = false;
@@ -299,6 +403,96 @@ export default function AdminPanel() {
     setAuthor("");
     setDescription("");
     setSections([createEmptySection()]);
+    setSelectedTrailId("");
+    setEditingTrailId(null);
+  };
+
+  const applyTrailToBuilder = (trail: AdminTrailDetail) => {
+    setName(trail.name ?? "");
+    setThumbnailUrl(trail.thumbnail_url ?? "");
+    setAuthor(trail.author ?? "");
+    setDescription(trail.description ?? "");
+    const mappedSections = trail.sections.length
+      ? trail.sections.map((section) => ({
+          id: randomId(),
+          title: section.title ?? "",
+          items: section.items.map((item) => {
+            const baseItem: DraftItem = {
+              id: randomId(),
+              title: item.title ?? "",
+              type: (item.type || "VIDEO").toUpperCase(),
+              content: item.url ?? "",
+              duration: item.duration_seconds != null ? String(item.duration_seconds) : "",
+              requiresCompletion: Boolean(item.requires_completion),
+              form: undefined,
+            };
+            if (baseItem.type === "FORM" && item.form) {
+              const questions = item.form.questions.map((question) => {
+                const questionType = toDraftQuestionType(question.type);
+                const draftQuestion: DraftFormQuestion = {
+                  id: randomId(),
+                  prompt: question.prompt ?? "",
+                  type: questionType,
+                  required: Boolean(question.required),
+                  points: String(question.points ?? 0),
+                  options:
+                    questionType === "ESSAY"
+                      ? []
+                      : question.options.map((option) => ({
+                          id: randomId(),
+                          text: option.text ?? "",
+                          isCorrect: option.is_correct,
+                          order: option.order_index ?? 0,
+                        })),
+                };
+                return ensureQuestionOptions(draftQuestion);
+              });
+              baseItem.form = {
+                title: item.form.title ?? "",
+                description: item.form.description ?? "",
+                minScore: String(item.form.min_score_to_pass ?? 70),
+                randomize: Boolean(item.form.randomize_questions),
+                questions,
+              };
+            }
+            return baseItem;
+          }),
+        }))
+      : [createEmptySection()];
+    setSections(mappedSections);
+    setEditingTrailId(trail.id);
+    setSelectedTrailId(String(trail.id));
+    setSaveError(null);
+    setSaveSuccess(null);
+  };
+
+  const loadTrailForEdit = async (trailId: number) => {
+    setLoadingTrail(true);
+    setSaveError(null);
+    setSaveSuccess(null);
+    setExistingTrailsError(null);
+    try {
+      const { data } = await http.get<{ trail: AdminTrailDetail }>(`/admin/trails/${trailId}`);
+      applyTrailToBuilder(data.trail);
+    } catch (err) {
+      setSaveError(normalizeError(err));
+    } finally {
+      setLoadingTrail(false);
+    }
+  };
+
+  const handleLoadSelectedTrail = () => {
+    if (!selectedTrailId) return;
+    const trailId = Number(selectedTrailId);
+    if (!Number.isFinite(trailId)) return;
+    void loadTrailForEdit(trailId);
+  };
+
+  const handleStartNewTrail = () => {
+    setSaveError(null);
+    setSaveSuccess(null);
+    setExistingTrailsError(null);
+    resetBuilder();
   };
 
   const addSection = () => {
@@ -607,6 +801,7 @@ export default function AdminPanel() {
     event.preventDefault();
     setSaveError(null);
     setSaveSuccess(null);
+    setExistingTrailsError(null);
 
     const trimmedName = name.trim();
     const trimmedThumbnail = thumbnailUrl.trim();
@@ -751,9 +946,16 @@ export default function AdminPanel() {
 
     setSaving(true);
     try {
-      await http.post("/admin/trails", payload);
-      setSaveSuccess("Rota criada com sucesso!");
-      resetBuilder();
+      if (isEditing && editingTrailId) {
+        await http.put(`/admin/trails/${editingTrailId}`, payload);
+        setSaveSuccess("Rota atualizada com sucesso!");
+      } else {
+        await http.post("/admin/trails", payload);
+        setSaveSuccess("Rota criada com sucesso!");
+        resetBuilder();
+      }
+      setExistingTrailsLoaded(false);
+      setExistingTrailsError(null);
       setDashboardLoaded(false);
     } catch (err) {
       setSaveError(normalizeError(err));
@@ -961,10 +1163,63 @@ export default function AdminPanel() {
           </div>
         ) : (
           <form className="admin-builder" onSubmit={handleSubmit}>
+            <div className="admin-builder-toolbar">
+              <div className="admin-builder-toolbar-group">
+                <label>
+                  <span>Editar rota existente</span>
+                  <select
+                    value={selectedTrailId}
+                    onChange={(event) => setSelectedTrailId(event.target.value)}
+                    disabled={existingTrailsLoading}
+                  >
+                    <option value="">Selecione uma rota</option>
+                    {existingTrails.map((trail) => (
+                      <option key={trail.id} value={trail.id}>
+                        {trail.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <div className="admin-builder-toolbar-actions">
+                <button
+                  type="button"
+                  className="admin-btn admin-btn-secondary"
+                  onClick={handleLoadSelectedTrail}
+                  disabled={!selectedTrailId || loadingTrail}
+                >
+                  {loadingTrail ? <Loader2 size={16} className="spin" /> : null}
+                  {isEditing && selectedTrailId === String(editingTrailId) ? "Recarregar" : "Carregar"}
+                </button>
+                <button
+                  type="button"
+                  className="admin-btn admin-btn-ghost"
+                  onClick={handleStartNewTrail}
+                  disabled={loadingTrail || saving}
+                >
+                  Nova rota
+                </button>
+              </div>
+            </div>
+            {isEditing ? (
+              <div className="admin-builder-status">
+                Editando: {name.trim() || `Rota #${editingTrailId}`}
+              </div>
+            ) : null}
+            {existingTrailsError ? (
+              <div className="admin-alert is-error">{existingTrailsError}</div>
+            ) : null}
+            {existingTrailsLoaded && !existingTrailsError && !existingTrails.length ? (
+              <div className="admin-hint">Nenhuma rota cadastrada ainda.</div>
+            ) : null}
             <section className="admin-card">
               <header>
                 <h2>Informações básicas</h2>
-                <p>Defina os principais dados da nova rota.</p>
+                <p>
+                  {isEditing
+                    ? "Atualize os dados da rota selecionada."
+                    : "Defina os principais dados da nova rota."}
+                </p>
               </header>
               <div className="admin-form-grid">
                 <label>
@@ -1413,14 +1668,14 @@ export default function AdminPanel() {
               <button
                 type="button"
                 className="admin-btn admin-btn-ghost"
-                onClick={resetBuilder}
-                disabled={saving}
+                onClick={handleStartNewTrail}
+                disabled={saving || loadingTrail}
               >
                 Limpar
               </button>
               <button type="submit" className="admin-btn admin-btn-primary" disabled={saving}>
                 {saving ? <Loader2 size={16} className="spin" /> : null}
-                Salvar rota
+                {isEditing ? "Atualizar rota" : "Salvar rota"}
               </button>
             </div>
           </form>

@@ -6,6 +6,8 @@ import "../styles/Trail.css";
 import Layout from "../components/Layout";
 import { useAuth } from "../hooks/AuthContext";
 
+const PROGRESS_SAVE_INTERVAL_MS = 15000; // 15s
+
 /** ===== Tipos vindos do seu back ===== */
 type Item = {
   id: number;
@@ -939,7 +941,7 @@ export default function Trail() {
     };
   }, [trailId, itemId, loadProgress]);
 
-  // salva progresso a cada 5s (PUT)
+  // salva progresso periodicamente para reduzir carga no backend
   useEffect(() => {
     if (!detail || detail.type !== "VIDEO") return;
     const id = window.setTimeout(async () => {
@@ -953,7 +955,7 @@ export default function Trail() {
       } catch {} finally {
         setSaving(false);
       }
-    }, 5000);
+    }, PROGRESS_SAVE_INTERVAL_MS);
     return () => clearTimeout(id);
   }, [watchedSeconds, canComplete, trailId, detail, loadProgress]);
 

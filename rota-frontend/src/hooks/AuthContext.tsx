@@ -1,7 +1,16 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { http } from "../lib/http";
 
-export type User = { id: string; username: string; profile_pic_url?: string | null, email: string; role: string; };
+export type User = {
+  id: string;
+  username: string;
+  email: string;
+  role: string;
+  profile_pic_url?: string | null;
+  banner_pic_url?: string | null;
+  sex?: string;
+  color?: string;
+};
 
 type AuthCtx = {
   user: User | null;

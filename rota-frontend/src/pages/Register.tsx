@@ -6,7 +6,8 @@ import { useState } from "react";
 import { http } from "../lib/http";
 import axios from "axios";
 import CookieError from "../components/CookieErrorPopup";
-import { Sex, sexOptions } from '../types/sex';
+import { Sex, sexOptions } from "../types/sex";
+import { SkinColor, skinColorOptions } from "../types/skinColor";
 
 export default function Register() {
         // SVGs para ícone de visibilidade
@@ -34,7 +35,8 @@ export default function Register() {
 
     const [showPassword, setShowPassword] = useState(false);
     const [email, setEmail] = useState("");
-    const [sex, setSex] = useState("");
+    const [sex, setSex] = useState<Sex | "">("");
+    const [color, setColor] = useState<SkinColor | "">("");
     const [password, setPassword] = useState("");
     const [name_for_certificate, setNameForCertificate] = useState("");
     const [social_name, setSocialName] = useState("");
@@ -50,6 +52,12 @@ export default function Register() {
         setErr(null);
         setLoading(true);
 
+        if (!sex || !color) {
+            setErr("Selecione uma opção de gênero e de cor/raça.");
+            setLoading(false);
+            return;
+        }
+
         const payload = {
             email: email.trim(),
             password,
@@ -57,7 +65,8 @@ export default function Register() {
             birthday: formatDateToYYYYMMDD(birthday),
             social_name,
             username,
-            sex
+            sex,
+            color
         };
 
         try {
@@ -137,8 +146,24 @@ export default function Register() {
                                     required
                                     onChange={(e) => setSex(e.target.value as Sex)}
                                 >
-                                    <option value="" disabled>Sexo</option>
+                                    <option value="" disabled>Gênero</option>
                                     {sexOptions.map(opt => (
+                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                    ))}
+                                </select>
+                                </div>
+
+                                <div className="form-field">
+                                <select
+                                    id="color"
+                                    name="color"
+                                    className="form-control with-icon icon-user"
+                                    value={color}
+                                    required
+                                    onChange={(e) => setColor(e.target.value as SkinColor)}
+                                >
+                                    <option value="" disabled>Com qual cor/raça você se identifica?</option>
+                                    {skinColorOptions.map(opt => (
                                     <option key={opt.value} value={opt.value}>{opt.label}</option>
                                     ))}
                                 </select>

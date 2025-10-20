@@ -136,12 +136,12 @@ export default function Register() {
                                     />
                                 </div>
 
-                                  <div className="form-field">
+                                <div className="form-field select-field">
 
                                 <select
                                     id="sex"
                                     name="sex"
-                                    className="form-control with-icon icon-user"
+                                    className="form-control"
                                     value={sex}
                                     required
                                     onChange={(e) => setSex(e.target.value as Sex)}
@@ -153,11 +153,11 @@ export default function Register() {
                                 </select>
                                 </div>
 
-                                <div className="form-field">
+                                <div className="form-field select-field">
                                 <select
                                     id="color"
                                     name="color"
-                                    className="form-control with-icon icon-user"
+                                    className="form-control"
                                     value={color}
                                     required
                                     onChange={(e) => setColor(e.target.value as SkinColor)}

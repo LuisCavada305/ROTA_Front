@@ -82,10 +82,32 @@
 /* Ícone de visibilidade no campo de senha */
 /* Campo de senha com overlay do botão/ícone */
 .form-field.password-field { position: relative; }
-.form-field.password-field .form-control {  
-  height: 44px;                /* igual aos outros campos */
-  box-sizing: content-box;
- } /* espaço p/ o ícone */
+.form-field.password-field .form-control {
+  height: 54px;
+  padding-right: 52px;
+  padding-left: 16px;
+  padding-top: 16px;
+  padding-bottom: 16px;
+  box-sizing: border-box;
+} /* espaço p/ o ícone */
+
+.form-field.select-field {
+  position: relative;
+}
+
+.form-field.select-field::after {
+  content: "";
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  width: 12px;
+  height: 8px;
+  pointer-events: none;
+  transform: translateY(-50%);
+  background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%23788599' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-size: 12px 8px;
+}
 
 /* Botão do “olho” posicionado absoluto, fora do fluxo (não empurra o input) */
 .password-visibility {
@@ -115,17 +137,48 @@
 
 .form-control {
   width: 100%;
-  height: 44px;
-  padding: 0 12px;
+  height: 54px;
+  padding: 16px;
   border: 1px solid #d1d5db;
-  border-radius: 10px;
+  border-radius: 12px;
   outline: none;
-  font-size: 14px;
-  line-height: normal;
+  font-size: 15px;
+  line-height: 1.3;
+  box-sizing: border-box;
 }
 .form-control:focus {
   border-color: #2563eb;
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+}
+
+select.form-control {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  width: 100%;
+  height: 54px;
+  padding: 0 44px 0 16px;
+  box-sizing: border-box;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  background-color: #fff;
+  line-height: 54px;
+  font-size: 15px;
+  text-align: left;
+}
+
+select.form-control:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+}
+
+select.form-control::-ms-expand {
+  display: none;
+}
+
+select.form-control:invalid,
+select.form-control option[disabled] {
+  color: #9ca3af;
 }
 
 /* Auxiliares */
@@ -213,50 +266,4 @@
     top: 16px;
     max-width: none;
   }
-}
-
-/* SELECT com visual idêntico ao .form-control */
-select.form-control {
-  /* reset/seta nativa */
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  appearance: none;
-
-  box-sizing: content-box;
-  /* mesmo “look” do input */
-  width: 100%;
-  height: 44px;
-  min-height: 44px;           /* Safari/Firefox */
-  padding: 0 12px;
-  border: 1px solid #d1d5db;
-  border-radius: 10px;
-  outline: none;
-  font-size: 14px;
-  line-height: normal;
-  background-color: #fff;
-  background-clip: padding-box;
-
-  /* setinha (chevron) SVG embutida */
-  background-image: url("data:image/svg+xml;utf8,\
-<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%239CA3AF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>\
-<polyline points='6,8 10,12 14,8'/>\
-</svg>");
-  background-repeat: no-repeat;
-  background-position: right 12px center;
-  background-size: 16px 16px;
-}
-
-/* foco igual aos outros campos */
-select.form-control:focus {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
-}
-
-/* remove seta legada do IE/Edge antigo (se existir) */
-select.form-control::-ms-expand { display: none; }
-
-/* opção “placeholder” opaca (se usar <option disabled selected>) */
-select.form-control:invalid,
-select.form-control option[disabled] {
-  color: #9ca3af;
 }

@@ -68,7 +68,7 @@ export default function Login() {
           <CookieError />
           <div className="form-head">
             <h2 className="head-left">Entrar</h2>
-            <NavLink className="head-right" to="/register">
+            <NavLink className="head-right" to="/registro">
               Crie a sua conta aqui
             </NavLink>
           </div>
@@ -114,7 +114,7 @@ export default function Login() {
               </label>
 
               <NavLink
-                to="/forgot-password"
+                to="/esqueci-minha-senha"
                 className="aux-link"
               >
                 Esqueceu sua senha?

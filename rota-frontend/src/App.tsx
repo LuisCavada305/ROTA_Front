@@ -12,6 +12,8 @@ import Certificate from "./pages/Certificate";
 import UserPanel from "./pages/UserPanel";
 import Profile from "./pages/Profile";
 import AdminPanel from "./pages/AdminPanel";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 
 
 
@@ -23,6 +25,10 @@ export default function App() {
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/registro" element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/esqueci-minha-senha" element={<ForgotPassword />} />
+        <Route path="/redefinir-senha" element={<ResetPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/trilhas" element={<Trails />} />
         <Route path="/trail-details/:id" element={<CourseDetails />} />
         <Route path="/trilha/:trailId/aula/:itemId" element={<Trail />} />

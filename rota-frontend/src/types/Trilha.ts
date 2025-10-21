@@ -4,6 +4,7 @@ export type Trilha = {
   thumbnail_url: string;
   author?: string;
   review?: number;          // 0..5
+  review_count?: number;
   botaoLabel?: string;      // opcional
   requirements?: string[];  
   targetAudience?: string[]; 

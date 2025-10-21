@@ -1,7 +1,7 @@
 import Layout from "../components/Layout";
 import "../styles/TrailDetails.css";
 import { http } from "../lib/http";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { normalizePaginatedPayload, type PaginatedPayload } from "../types/Pagination";
 
@@ -27,6 +27,10 @@ type TrailCore = {
   description?: string | null;
   author?: string | null;
   category?: string | null;
+  review?: number | null;
+  review_count?: number | null;
+  user_review_rating?: number | null;
+  user_review_comment?: string | null;
 };
 
 type TextValRow = { text_val: string };
@@ -46,6 +50,8 @@ type Progress = {
   status?: string | null;
   completed_at?: string | null;
   certificate?: CertificateSummary;
+  reviewRating?: number | null;
+  reviewComment?: string | null;
 };
 
 function secondsToMMSS(total?: number | null) {
@@ -73,6 +79,12 @@ export default function TrailDetails() {
   const [enrollError, setEnrollError] = useState<string | null>(null);
   const [certLoading, setCertLoading] = useState(false);
   const [certError, setCertError] = useState<string | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
+  const shareMenuRef = useRef<HTMLDivElement | null>(null);
+  const [hoverRating, setHoverRating] = useState<number | null>(null);
+  const [reviewSaving, setReviewSaving] = useState(false);
+  const [reviewFeedback, setReviewFeedback] = useState<{ message: string; kind: "success" | "error" } | null>(null);
   const navigate = useNavigate();
 
   // "View model" final que a UI consome
@@ -90,6 +102,8 @@ export default function TrailDetails() {
     audience: string[];
     progress: Progress;
     nextLessonDate?: string; // dd/mm/aaaa (apenas exibição)
+    ratingAverage: number | null;
+    ratingCount: number;
   } | null>(null);
 
   useEffect(() => {
@@ -178,6 +192,8 @@ export default function TrailDetails() {
             computed_progress_percent?: number;
             started_at?: string;
             certificate?: { hash: string; credential_id: string; issued_at?: string | null } | null;
+            review_rating?: number | null;
+            review_comment?: string | null;
           }>(
             `/user-trails/${id}/progress`
           )
@@ -185,11 +201,15 @@ export default function TrailDetails() {
             computed_progress_percent?: number;
             started_at?: string;
             certificate?: { hash: string; credential_id: string; issued_at?: string | null } | null;
+            review_rating?: number | null;
+            review_comment?: string | null;
           })
           .catch(() => ({}) as Partial<Progress> & {
             computed_progress_percent?: number;
             started_at?: string;
             certificate?: { hash: string; credential_id: string; issued_at?: string | null } | null;
+            review_rating?: number | null;
+            review_comment?: string | null;
           });
 
         // 5) pegar “aprendizados” (se existir; senão usamos vazio)
@@ -244,6 +264,17 @@ export default function TrailDetails() {
         const pctCalc =
           total > 0 ? Math.round((done / total) * 100) : pctFromBack ?? 0;
 
+        const ratingAverage = core.review != null ? Number(core.review) : null;
+        const ratingCount =
+          typeof core.review_count === "number" ? core.review_count : 0;
+        const reviewRating =
+          typeof progressRaw?.review_rating === "number"
+            ? progressRaw.review_rating
+            : typeof core.user_review_rating === "number"
+            ? core.user_review_rating
+            : null;
+        const reviewComment = progressRaw?.review_comment ?? core.user_review_comment ?? null;
+
         const progress: Progress = {
           done,
           total,
@@ -253,6 +284,8 @@ export default function TrailDetails() {
           status: progressRaw?.status ?? null,
           completed_at: progressRaw?.completed_at ?? null,
           certificate: progressRaw?.certificate ?? null,
+          reviewRating,
+          reviewComment,
         };
 
         const nextLessonDate = progress.enrolledAt
@@ -273,6 +306,8 @@ export default function TrailDetails() {
           audience,
           progress,
           nextLessonDate,
+          ratingAverage,
+          ratingCount,
         };
 
         if (mounted) setVm(vmBuilt);
@@ -318,6 +353,137 @@ export default function TrailDetails() {
 
     return normalized;
   }, [vm?.id, setVm]);
+
+  const shareUrl = useMemo(() => {
+    if (typeof window === "undefined") return "";
+    if (!vm?.id) return window.location.href;
+    try {
+      return new URL(`/trail-details/${vm.id}`, window.location.origin).toString();
+    } catch {
+      return window.location.href;
+    }
+  }, [vm?.id]);
+
+  const canNativeShare = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    return typeof navigator !== "undefined" && typeof navigator.share === "function";
+  }, []);
+
+  useEffect(() => {
+    if (!shareOpen) return;
+    function handleClickOutside(ev: MouseEvent) {
+      if (!shareMenuRef.current) return;
+      if (!shareMenuRef.current.contains(ev.target as Node)) {
+        setShareOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [shareOpen]);
+
+  useEffect(() => {
+    if (copyState === "idle") return;
+    const timer = window.setTimeout(() => setCopyState("idle"), 2500);
+    return () => window.clearTimeout(timer);
+  }, [copyState]);
+
+  useEffect(() => {
+    if (!reviewFeedback) return;
+    const timer = window.setTimeout(() => setReviewFeedback(null), 3200);
+    return () => window.clearTimeout(timer);
+  }, [reviewFeedback]);
+
+  const handleNativeShare = useCallback(async () => {
+    if (!shareUrl || !canNativeShare || !vm) return;
+    try {
+      await navigator.share({ title: vm.title, url: shareUrl });
+      setShareOpen(false);
+    } catch (error) {
+      console.warn("Compartilhamento nativo interrompido", error);
+    }
+  }, [shareUrl, canNativeShare, vm]);
+
+  const handleCopyLink = useCallback(async () => {
+    if (!shareUrl) return;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(shareUrl);
+      } else {
+        const textArea = document.createElement("textarea");
+        textArea.value = shareUrl;
+        textArea.setAttribute("readonly", "");
+        textArea.style.position = "absolute";
+        textArea.style.left = "-9999px";
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textArea);
+      }
+      setCopyState("copied");
+    } catch (error) {
+      console.warn("Falha ao copiar link da trilha", error);
+      setCopyState("error");
+    }
+  }, [shareUrl]);
+
+  const handleSubmitReview = useCallback(
+    async (rating: number) => {
+      const trailId = vm?.id;
+      const currentRating = vm?.progress.reviewRating ?? null;
+      if (!trailId || reviewSaving) return;
+      if (currentRating === rating) {
+        setReviewFeedback({ message: "Esta já é sua avaliação atual.", kind: "success" });
+        setHoverRating(null);
+        return;
+      }
+      setReviewSaving(true);
+      setReviewFeedback(null);
+      try {
+        const { data } = await http.post<{
+          ok: boolean;
+          rating: number;
+          average?: number | null;
+          count?: number | null;
+        }>(`/trails/${trailId}/reviews`, { rating });
+
+        const average =
+          typeof data.average === "number" ? Number(data.average) : null;
+        const count = typeof data.count === "number" ? data.count : undefined;
+
+        setVm((prev) =>
+          prev && prev.id === trailId
+            ? {
+                ...prev,
+                ratingAverage: average ?? prev.ratingAverage,
+                ratingCount: typeof count === "number" ? count : prev.ratingCount,
+                progress: {
+                  ...prev.progress,
+                  reviewRating: rating,
+                },
+              }
+            : prev
+        );
+        setHoverRating(null);
+        setReviewFeedback({ message: "Obrigado pela sua avaliação!", kind: "success" });
+      } catch (error: any) {
+        const statusCode = error?.response?.status;
+        if (statusCode === 401) {
+          navigate("/login");
+          return;
+        }
+        const message =
+          statusCode === 403
+            ? "Conclua a trilha para poder avaliá-la."
+            : "Não foi possível salvar sua avaliação. Tente novamente.";
+        setReviewFeedback({ message, kind: "error" });
+      } finally {
+        setReviewSaving(false);
+      }
+    },
+    [vm?.id, vm?.progress.reviewRating, navigate, reviewSaving]
+  );
 
   useEffect(() => {
     if (!vm) return;
@@ -477,7 +643,34 @@ export default function TrailDetails() {
               </div>
             </div>
             <div className="trail-actions">
-              <button className="btn btn-ghost">Compartilhar</button>
+              <div className="share-group" ref={shareMenuRef}>
+                <button
+                  className="btn btn-ghost"
+                  type="button"
+                  onClick={() => setShareOpen((prev) => !prev)}
+                  aria-haspopup="menu"
+                  aria-expanded={shareOpen}
+                >
+                  Compartilhar
+                </button>
+                {shareOpen && (
+                  <div className="share-menu" role="menu">
+                    {canNativeShare && (
+                      <button type="button" className="share-menu__item" onClick={handleNativeShare}>
+                        Enviar pelo dispositivo…
+                      </button>
+                    )}
+                    <button type="button" className="share-menu__item" onClick={handleCopyLink}>
+                      {copyState === "copied" ? "Link copiado!" : "Copiar link"}
+                    </button>
+                    {copyState === "error" && (
+                      <div className="share-menu__feedback" role="status">
+                        Não foi possível copiar automaticamente. Use Ctrl+C.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </header>
 
@@ -620,11 +813,101 @@ export default function TrailDetails() {
                 <div className="mini-list__item">🏅 Certificado de conclusão</div>
               </div>
 
-              <div className="card instructor">
-                <h4 className="card-title">Um curso de</h4>
-                <div className="instructor-row">
-                  <div className="avatar">{vm.instructor.initials}</div>
-                  <div className="instructor-name">{vm.instructor.name}</div>
+            <div className="card review-card">
+              <h4 className="card-title">Avaliações</h4>
+              <div className="review-summary">
+                <div className="review-summary__value">
+                  {vm.ratingAverage != null ? vm.ratingAverage.toFixed(1) : "—"}
+                </div>
+                <div className="review-summary__meta">
+                  <div
+                    className="review-summary__stars"
+                    aria-label={
+                      vm.ratingAverage != null
+                        ? `Avaliação média ${vm.ratingAverage.toFixed(1)} de 5`
+                        : "Sem avaliações registradas"
+                    }
+                  >
+                    {[1, 2, 3, 4, 5].map((value) => {
+                      const filled = vm.ratingAverage != null && vm.ratingAverage >= value - 0.25;
+                      return (
+                        <span
+                          key={`avg-${value}`}
+                          className={`review-star-icon${filled ? " is-filled" : ""}`}
+                          aria-hidden="true"
+                        >
+                          ★
+                        </span>
+                      );
+                    })}
+                  </div>
+                  <div className="review-summary__count">
+                    {vm.ratingCount > 0
+                      ? `${vm.ratingCount} ${vm.ratingCount === 1 ? "avaliação" : "avaliações"}`
+                      : "Seja o primeiro a avaliar"}
+                  </div>
+                </div>
+              </div>
+              {vm.progress.status === "COMPLETED" ? (
+                <div className="review-actions">
+                  <p className="review-actions__label">
+                    {vm.progress.reviewRating
+                      ? "Sua avaliação"
+                      : "Avalie esta trilha"}
+                  </p>
+                  <div
+                    className="review-stars"
+                    role="radiogroup"
+                    aria-label="Defina sua avaliação para esta trilha"
+                  >
+                    {[1, 2, 3, 4, 5].map((value) => {
+                      const activeBase = vm.progress.reviewRating || 0;
+                      const isActive =
+                        (hoverRating ?? activeBase) >= value;
+                      return (
+                        <button
+                          key={`user-${value}`}
+                          type="button"
+                          className={`review-star${isActive ? " is-active" : ""}`}
+                          onMouseEnter={() => setHoverRating(value)}
+                          onMouseLeave={() => setHoverRating(null)}
+                          onFocus={() => setHoverRating(value)}
+                          onBlur={() => setHoverRating(null)}
+                          onClick={() => handleSubmitReview(value)}
+                          role="radio"
+                          aria-checked={vm.progress.reviewRating === value}
+                          aria-label={`${value} ${value === 1 ? "estrela" : "estrelas"}`}
+                          disabled={reviewSaving}
+                        >
+                          ★
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <span className="review-hint">
+                    {reviewSaving
+                      ? "Salvando sua avaliação…"
+                      : vm.progress.reviewRating
+                      ? "Clique nas estrelas para ajustar sua nota."
+                      : "Compartilhe sua opinião após concluir a trilha."}
+                  </span>
+                  {reviewFeedback && (
+                    <div
+                      className={`review-feedback review-feedback--${reviewFeedback.kind}`}
+                      role="status"
+                    >
+                      {reviewFeedback.message}
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="card instructor">
+              <h4 className="card-title">Um curso de</h4>
+              <div className="instructor-row">
+                <div className="avatar">{vm.instructor.initials}</div>
+                <div className="instructor-name">{vm.instructor.name}</div>
                 </div>
               </div>
 

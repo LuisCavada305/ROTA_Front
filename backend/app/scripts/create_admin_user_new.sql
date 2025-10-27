@@ -5,7 +5,7 @@
 WITH role_ids AS (
   SELECT
     (SELECT id FROM lk_role WHERE code = 'Admin') AS admin_role_id,
-    (SELECT id FROM lk_sex WHERE code = 'N') AS default_sex_id
+    (SELECT id FROM lk_sex WHERE code IN ('N', 'NS') ORDER BY code LIMIT 1) AS default_sex_id
 )
 INSERT INTO users (
   email,

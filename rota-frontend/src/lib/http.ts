@@ -1,6 +1,6 @@
 // src/lib/http.ts
 import axios, { AxiosError, AxiosHeaders } from "axios";
-import type { InternalAxiosRequestConfig } from "axios";
+import type { InternalAxiosRequestConfig, AxiosRequestHeaders } from "axios";
 
 declare module "axios" {
   // permite marcar chamadas que NÃO devem abrir o modal
@@ -89,11 +89,9 @@ http.interceptors.request.use((config) => {
         config.headers.set("X-CSRF-Token", token);
         config.headers.set("X-CSRFToken", token);
       } else {
-        const headers = {
-          ...(config.headers as Record<string, unknown> | undefined),
-          "X-CSRF-Token": token,
-          "X-CSRFToken": token,
-        };
+        const headers = AxiosHeaders.from(config.headers ?? {} as AxiosRequestHeaders);
+        headers.set("X-CSRF-Token", token);
+        headers.set("X-CSRFToken", token);
         config.headers = headers;
       }
     }

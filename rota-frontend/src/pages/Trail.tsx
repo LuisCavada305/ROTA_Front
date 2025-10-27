@@ -384,7 +384,6 @@ function YouTubePlayer({
     if (h > 0) return `${h}:${pad(m)}:${pad(s)}`;
     return `${pad(m)}:${pad(s)}`;
   };
-  const pct = duration ? (current / duration) * 100 : 0;
   const playedPct = duration
     ? Math.min(100, (Math.max(current, playedSeconds) / duration) * 100)
     : 0;

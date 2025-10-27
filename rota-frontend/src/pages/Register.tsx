@@ -17,14 +17,6 @@ export default function Register() {
         const EyeOffIcon = (
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a21.77 21.77 0 0 1 5.06-7.94"></path><path d="M1 1l22 22"></path><path d="M9.53 9.53A3 3 0 0 0 12 15a3 3 0 0 0 2.47-5.47"></path></svg>
         );
-    // Função para formatar data para dd/mm/yyyy
-    function formatDateToDDMMYYYY(dateStr: string) {
-        if (!dateStr) return "";
-        const [year, month, day] = dateStr.split("-");
-        if (!year || !month || !day) return dateStr;
-        return `${day}/${month}/${year}`;
-    }
-
     // Função para converter dd/mm/yyyy para yyyy-mm-dd
     function formatDateToYYYYMMDD(dateStr: string) {
         if (!dateStr) return "";

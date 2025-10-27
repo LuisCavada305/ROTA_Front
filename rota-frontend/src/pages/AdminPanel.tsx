@@ -190,7 +190,7 @@ function createDefaultOptionsFor(type: DraftQuestionType): DraftFormOption[] {
   return [];
 }
 
-function createEmptyQuestion(type: DraftQuestionType, order: number): DraftFormQuestion {
+function createEmptyQuestion(type: DraftQuestionType): DraftFormQuestion {
   return {
     id: randomId(),
     prompt: "",
@@ -239,7 +239,7 @@ function createDefaultForm(): DraftForm {
     description: "",
     minScore: "70",
     randomize: false,
-    questions: [createEmptyQuestion("SINGLE_CHOICE", 0)],
+    questions: [createEmptyQuestion("SINGLE_CHOICE")],
   };
 }
 
@@ -598,7 +598,7 @@ export default function AdminPanel() {
           if (merged.form && merged.type === "FORM") {
             merged.form = {
               ...merged.form,
-              questions: merged.form.questions.map((question, index) => {
+              questions: merged.form.questions.map((question) => {
                 const ensured = ensureQuestionOptions(question);
                 return {
                   ...ensured,
@@ -627,7 +627,7 @@ export default function AdminPanel() {
           if (item.type !== "FORM" || !item.form) return item;
           const nextForm = updater(item.form);
           const ensuredQuestions = (
-            nextForm.questions.length ? nextForm.questions : [createEmptyQuestion("SINGLE_CHOICE", 0)]
+            nextForm.questions.length ? nextForm.questions : [createEmptyQuestion("SINGLE_CHOICE")]
           ).map((question) => ensureQuestionOptions(question));
           return {
             ...item,
@@ -653,7 +653,7 @@ export default function AdminPanel() {
   const addQuestion = (sectionId: string, itemId: string, type: DraftQuestionType) => {
     setFormState(sectionId, itemId, (form) => ({
       ...form,
-      questions: [...form.questions, createEmptyQuestion(type, form.questions.length)],
+      questions: [...form.questions, createEmptyQuestion(type)],
     }));
   };
 
@@ -1434,173 +1434,176 @@ export default function AdminPanel() {
                               </div>
 
                               <div className="admin-question-list">
-                                {item.form.questions.map((question, questionIndex) => (
-                                  <div className="admin-question-card" key={question.id}>
-                                    <div className="admin-question-header">
-                                      <div>
-                                        <h4>Pergunta {questionIndex + 1}</h4>
-                                      </div>
-                                      <div className="admin-question-actions">
-                                        <button
-                                          type="button"
-                                          className="icon-btn"
-                                          onClick={() => moveQuestion(section.id, item.id, question.id, -1)}
-                                          disabled={questionIndex === 0}
-                                          aria-label="Mover pergunta para cima"
-                                        >
-                                          <ArrowUp size={16} />
-                                        </button>
-                                        <button
-                                          type="button"
-                                          className="icon-btn"
-                                          onClick={() => moveQuestion(section.id, item.id, question.id, 1)}
-                                          disabled={questionIndex === item.form.questions.length - 1}
-                                          aria-label="Mover pergunta para baixo"
-                                        >
-                                          <ArrowDown size={16} />
-                                        </button>
-                                        <button
-                                          type="button"
-                                          className="icon-btn danger"
-                                          onClick={() => removeQuestion(section.id, item.id, question.id)}
-                                          aria-label="Remover pergunta"
-                                          disabled={item.form.questions.length <= 1}
-                                        >
-                                          <Trash2 size={16} />
-                                        </button>
-                                      </div>
-                                    </div>
-
-                                    <div className="admin-question-grid">
-                                      <label className="full">
-                                        <span>Enunciado</span>
-                                        <textarea
-                                          value={question.prompt}
-                                          onChange={(event) =>
-                                            updateQuestion(section.id, item.id, question.id, {
-                                              prompt: event.target.value,
-                                            })
-                                          }
-                                          placeholder="Digite a pergunta"
-                                        ></textarea>
-                                      </label>
-                                      <label>
-                                        <span>Tipo</span>
-                                        <select
-                                          value={question.type}
-                                          onChange={(event) =>
-                                            updateQuestion(section.id, item.id, question.id, {
-                                              type: event.target.value as DraftQuestionType,
-                                            })
-                                          }
-                                        >
-                                          {availableQuestionTypes.map((option) => (
-                                            <option key={option.code} value={option.code}>
-                                              {option.label}
-                                            </option>
-                                          ))}
-                                        </select>
-                                      </label>
-                                      <label>
-                                        <span>Valor (pontos)</span>
-                                        <input
-                                          type="number"
-                                          min={0}
-                                          step={0.5}
-                                          value={question.points}
-                                          onChange={(event) =>
-                                            updateQuestion(section.id, item.id, question.id, {
-                                              points: event.target.value,
-                                            })
-                                          }
-                                        />
-                                      </label>
-                                      <label className="checkbox-inline">
-                                        <input
-                                          type="checkbox"
-                                          checked={question.required}
-                                          onChange={(event) =>
-                                            updateQuestion(section.id, item.id, question.id, {
-                                              required: event.target.checked,
-                                            })
-                                          }
-                                        />
-                                        <span>Pergunta obrigatória</span>
-                                      </label>
-                                    </div>
-
-                                    {question.type !== "ESSAY" ? (
-                                      <div className="admin-option-list">
-                                        {question.options.map((option, optionIndex) => (
-                                          <div className="admin-option-row" key={option.id}>
-                                            <label className="radio">
-                                              <input
-                                                type="radio"
-                                                name={`correct-${question.id}`}
-                                                checked={option.isCorrect}
-                                                onChange={() => setCorrectOption(section.id, item.id, question.id, option.id)}
-                                              />
-                                              <span>Correta</span>
-                                            </label>
-                                            <input
-                                              type="text"
-                                              value={option.text}
-                                              onChange={(event) =>
-                                                updateOption(section.id, item.id, question.id, option.id, {
-                                                  text: event.target.value,
-                                                })
-                                              }
-                                              placeholder={`Alternativa ${optionIndex + 1}`}
-                                              disabled={question.type === "TRUE_OR_FALSE"}
-                                            />
-                                            <div className="admin-option-actions">
-                                              {question.type === "SINGLE_CHOICE" ? (
-                                                <>
-                                                  <button
-                                                    type="button"
-                                                    className="icon-btn"
-                                                    onClick={() => moveOption(section.id, item.id, question.id, option.id, -1)}
-                                                    disabled={optionIndex === 0}
-                                                    aria-label="Mover alternativa para cima"
-                                                  >
-                                                    <ArrowUp size={14} />
-                                                  </button>
-                                                  <button
-                                                    type="button"
-                                                    className="icon-btn"
-                                                    onClick={() => moveOption(section.id, item.id, question.id, option.id, 1)}
-                                                    disabled={optionIndex === question.options.length - 1}
-                                                    aria-label="Mover alternativa para baixo"
-                                                  >
-                                                    <ArrowDown size={14} />
-                                                  </button>
-                                                  <button
-                                                    type="button"
-                                                    className="icon-btn danger"
-                                                    onClick={() => removeOption(section.id, item.id, question.id, option.id)}
-                                                    aria-label="Remover alternativa"
-                                                    disabled={question.options.length <= 2}
-                                                  >
-                                                    <Trash2 size={14} />
-                                                  </button>
-                                                </>
-                                              ) : null}
-                                            </div>
-                                          </div>
-                                        ))}
-                                        {question.type === "SINGLE_CHOICE" ? (
+                                {item.form.questions.map((question, questionIndex) => {
+                                  const totalQuestions = item.form?.questions.length ?? 0;
+                                  return (
+                                    <div className="admin-question-card" key={question.id}>
+                                      <div className="admin-question-header">
+                                        <div>
+                                          <h4>Pergunta {questionIndex + 1}</h4>
+                                        </div>
+                                        <div className="admin-question-actions">
                                           <button
                                             type="button"
-                                            className="admin-btn admin-btn-ghost"
-                                            onClick={() => addOption(section.id, item.id, question.id)}
+                                            className="icon-btn"
+                                            onClick={() => moveQuestion(section.id, item.id, question.id, -1)}
+                                            disabled={questionIndex === 0}
+                                            aria-label="Mover pergunta para cima"
                                           >
-                                            <Plus size={14} /> Adicionar alternativa
+                                            <ArrowUp size={16} />
                                           </button>
-                                        ) : null}
+                                          <button
+                                            type="button"
+                                            className="icon-btn"
+                                            onClick={() => moveQuestion(section.id, item.id, question.id, 1)}
+                                            disabled={questionIndex === totalQuestions - 1}
+                                            aria-label="Mover pergunta para baixo"
+                                          >
+                                            <ArrowDown size={16} />
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className="icon-btn danger"
+                                            onClick={() => removeQuestion(section.id, item.id, question.id)}
+                                            aria-label="Remover pergunta"
+                                            disabled={totalQuestions <= 1}
+                                          >
+                                            <Trash2 size={16} />
+                                          </button>
+                                        </div>
                                       </div>
-                                    ) : null}
-                                  </div>
-                                ))}
+
+                                      <div className="admin-question-grid">
+                                        <label className="full">
+                                          <span>Enunciado</span>
+                                          <textarea
+                                            value={question.prompt}
+                                            onChange={(event) =>
+                                              updateQuestion(section.id, item.id, question.id, {
+                                                prompt: event.target.value,
+                                              })
+                                            }
+                                            placeholder="Digite a pergunta"
+                                          ></textarea>
+                                        </label>
+                                        <label>
+                                          <span>Tipo</span>
+                                          <select
+                                            value={question.type}
+                                            onChange={(event) =>
+                                              updateQuestion(section.id, item.id, question.id, {
+                                                type: event.target.value as DraftQuestionType,
+                                              })
+                                            }
+                                          >
+                                            {availableQuestionTypes.map((option) => (
+                                              <option key={option.code} value={option.code}>
+                                                {option.label}
+                                              </option>
+                                            ))}
+                                          </select>
+                                        </label>
+                                        <label>
+                                          <span>Valor (pontos)</span>
+                                          <input
+                                            type="number"
+                                            min={0}
+                                            step={0.5}
+                                            value={question.points}
+                                            onChange={(event) =>
+                                              updateQuestion(section.id, item.id, question.id, {
+                                                points: event.target.value,
+                                              })
+                                            }
+                                          />
+                                        </label>
+                                        <label className="checkbox-inline">
+                                          <input
+                                            type="checkbox"
+                                            checked={question.required}
+                                            onChange={(event) =>
+                                              updateQuestion(section.id, item.id, question.id, {
+                                                required: event.target.checked,
+                                              })
+                                            }
+                                          />
+                                          <span>Pergunta obrigatória</span>
+                                        </label>
+                                      </div>
+
+                                      {question.type !== "ESSAY" ? (
+                                        <div className="admin-option-list">
+                                          {question.options.map((option, optionIndex) => (
+                                            <div className="admin-option-row" key={option.id}>
+                                              <label className="radio">
+                                                <input
+                                                  type="radio"
+                                                  name={`correct-${question.id}`}
+                                                  checked={option.isCorrect}
+                                                  onChange={() => setCorrectOption(section.id, item.id, question.id, option.id)}
+                                                />
+                                                <span>Correta</span>
+                                              </label>
+                                              <input
+                                                type="text"
+                                                value={option.text}
+                                                onChange={(event) =>
+                                                  updateOption(section.id, item.id, question.id, option.id, {
+                                                    text: event.target.value,
+                                                  })
+                                                }
+                                                placeholder={`Alternativa ${optionIndex + 1}`}
+                                                disabled={question.type === "TRUE_OR_FALSE"}
+                                              />
+                                              <div className="admin-option-actions">
+                                                {question.type === "SINGLE_CHOICE" ? (
+                                                  <>
+                                                    <button
+                                                      type="button"
+                                                      className="icon-btn"
+                                                      onClick={() => moveOption(section.id, item.id, question.id, option.id, -1)}
+                                                      disabled={optionIndex === 0}
+                                                      aria-label="Mover alternativa para cima"
+                                                    >
+                                                      <ArrowUp size={14} />
+                                                    </button>
+                                                    <button
+                                                      type="button"
+                                                      className="icon-btn"
+                                                      onClick={() => moveOption(section.id, item.id, question.id, option.id, 1)}
+                                                      disabled={optionIndex === question.options.length - 1}
+                                                      aria-label="Mover alternativa para baixo"
+                                                    >
+                                                      <ArrowDown size={14} />
+                                                    </button>
+                                                    <button
+                                                      type="button"
+                                                      className="icon-btn danger"
+                                                      onClick={() => removeOption(section.id, item.id, question.id, option.id)}
+                                                      aria-label="Remover alternativa"
+                                                      disabled={question.options.length <= 2}
+                                                    >
+                                                      <Trash2 size={14} />
+                                                    </button>
+                                                  </>
+                                                ) : null}
+                                              </div>
+                                            </div>
+                                          ))}
+                                          {question.type === "SINGLE_CHOICE" ? (
+                                            <button
+                                              type="button"
+                                              className="admin-btn admin-btn-ghost"
+                                              onClick={() => addOption(section.id, item.id, question.id)}
+                                            >
+                                              <Plus size={14} /> Adicionar alternativa
+                                            </button>
+                                          ) : null}
+                                        </div>
+                                      ) : null}
+                                    </div>
+                                  );
+                                })}
 
                                 <button
                                   type="button"

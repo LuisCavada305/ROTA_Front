@@ -1,4 +1,5 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { FormEvent, ReactNode } from "react";
 import { Link, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import Layout from "../components/Layout";
 import Avatar from "../components/Avatar";
@@ -490,7 +491,6 @@ function ForumTopicsView() {
 
 function TopicPostsView() {
   const params = useParams();
-  const forumId = params.forumId ?? "";
   const topicId = params.topicId ?? "";
   const [data, setData] = useState<TopicPostsPayload | null>(null);
   const [pagination, setPagination] = useState<PaginationMeta | null>(null);
@@ -599,7 +599,7 @@ function TopicPostsView() {
     });
   }
 
-  function renderPosts(tree: ForumPost[], depth = 0): JSX.Element | null {
+  function renderPosts(tree: ForumPost[], depth = 0): ReactNode {
     if (!tree.length) return null;
     const listClass = depth === 0 ? "forum-post-list" : "forum-post-list forum-post-replies";
     return (

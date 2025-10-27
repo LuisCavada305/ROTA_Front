@@ -6,6 +6,7 @@ export type Trilha = {
   review?: number;          // 0..5
   review_count?: number;
   botaoLabel?: string;      // opcional
+  description?: string | null;
   requirements?: string[];  
   targetAudience?: string[]; 
   includedItems?: string[];

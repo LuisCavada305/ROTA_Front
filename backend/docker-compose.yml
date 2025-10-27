@@ -68,6 +68,8 @@ services:
       DB_POOL_RECYCLE: 1800
       JWT_SECRET: b9178db8999f0fd224c7e97acb9e7d2e
       CSRF_SECRET: 5f6c6ed1a9d44716a198ce7a810cdc2d
+      CSRF_COOKIE_NAME: rota_csrftoken
+      COOKIE_DOMAIN: .72-61-32-2.nip.io
       REDIS_URL: redis://redis:6379/0
       AUTH_RATE_LIMIT_WINDOW_SECONDS: 60
       AUTH_RATE_LIMIT_MAX_ATTEMPTS: 5

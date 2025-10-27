@@ -15,6 +15,7 @@ INSERT INTO users (
   username,
   birthday,
   sex_id,
+  color_id,
   role_id
 )
 SELECT

@@ -1,0 +1,185 @@
+name: App Deploy
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+concurrency:
+  group: app-deploy
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    env:
+      REMOTE_HOST: ${{ secrets.DEPLOY_HOST }}
+      REMOTE_USER: ${{ secrets.DEPLOY_USER }}
+      REMOTE_PATH: ${{ secrets.DEPLOY_PATH }}   # ex: /opt/rota/backend
+      PYTHON_VERSION: "3.12"
+      NODE_VERSION: "20"
+      DOCKER_PROJECT: ${{ secrets.DOCKER_PROJECT }}
+      HEALTHCHECK_URL: ${{ secrets.HEALTHCHECK_URL }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('backend/requirements.txt') }}
+          restore-keys: ${{ runner.os }}-pip-
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Copy frontend build into backend
+        run: |
+          rm -rf backend/frontend_dist
+          mkdir -p backend/frontend_dist
+          cp -r frontend/dist/. backend/frontend_dist/
+
+      - name: Install deps (CI)
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          # se tiver testes pesados que exigem serviços externos, use tox/mocks
+
+      - name: Run tests
+        working-directory: backend
+        run: pytest -v
+
+      - name: Configure SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Add known hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "$REMOTE_HOST" >> ~/.ssh/known_hosts
+
+      - name: Upload .env (opcional)
+        env:
+          ENV_FILE_PROD: ${{ secrets.ENV_FILE_PROD }}
+        if: ${{ env.ENV_FILE_PROD != '' }}
+        run: |
+          tmp_env="$(mktemp)"
+          printf '%s\n' "${ENV_FILE_PROD}" > "$tmp_env"
+          scp "$tmp_env" "${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_PATH}/.env"
+          rm -f "$tmp_env"
+          ssh "${REMOTE_USER}@${REMOTE_HOST}" "chmod 600 ${REMOTE_PATH}/.env || true"
+
+      - name: Rsync source to server (staging dir)
+        run: |
+          RELEASE_ID="$(date +'%Y%m%d%H%M%S')"
+          echo "RELEASE_ID=${RELEASE_ID}" >> $GITHUB_ENV
+          ssh "${REMOTE_USER}@${REMOTE_HOST}" "mkdir -p ${REMOTE_PATH}/releases/${RELEASE_ID}"
+          rsync -az --delete \
+            --exclude '.git' \
+            --exclude 'venv' \
+            --exclude '.venv' \
+            --exclude '__pycache__' \
+            --exclude '.env' \
+            backend/ "${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_PATH}/releases/${RELEASE_ID}/"
+
+      - name: Activate release, build containers, restart stack (with healthcheck & rollback)
+        env:
+          RELEASE_ID: ${{ env.RELEASE_ID }}
+        run: |
+          ssh "${REMOTE_USER}@${REMOTE_HOST}" "RELEASE_ID='${RELEASE_ID}' REMOTE_PATH='${REMOTE_PATH}' DOCKER_PROJECT='${DOCKER_PROJECT}' HEALTHCHECK_URL='${HEALTHCHECK_URL}' bash -s" <<'EOF'
+            set -euo pipefail
+
+            BASE="${REMOTE_PATH}"
+            REL_DIR="$BASE/releases/${RELEASE_ID}"
+            CUR_LINK="$BASE/current"
+            ENV_FILE="$BASE/.env"
+            COMPOSE_PROJECT="${DOCKER_PROJECT:-rota_backend}"
+            HEALTH_URL="${HEALTHCHECK_URL:-}"
+
+            if [ ! -f "$ENV_FILE" ]; then
+              echo "Arquivo de ambiente $ENV_FILE não encontrado. Crie-o via secrets (ENV_FILE_PROD)." >&2
+              exit 1
+            fi
+
+            COMPOSE_CMD="docker compose"
+            if ! docker compose version >/dev/null 2>&1; then
+              if command -v docker-compose >/dev/null 2>&1; then
+                COMPOSE_CMD="docker-compose"
+              else
+                echo "Nem 'docker compose' nem 'docker-compose' estão disponíveis no servidor." >&2
+                exit 1
+              fi
+            fi
+
+            PREV_DIR=""
+            if [ -L "$CUR_LINK" ] || [ -d "$CUR_LINK" ]; then
+              PREV_DIR=$(readlink -f "$CUR_LINK" || true)
+            fi
+
+            ln -sfn "$REL_DIR" "$CUR_LINK"
+
+            cd "$REL_DIR"
+
+            $COMPOSE_CMD -p "$COMPOSE_PROJECT" --env-file "$ENV_FILE" pull --ignore-pull-failures || true
+            $COMPOSE_CMD -p "$COMPOSE_PROJECT" --env-file "$ENV_FILE" up -d --build --remove-orphans
+
+            if [ -z "$HEALTH_URL" ]; then
+              HEALTH_URL="http://127.0.0.1:8000/healthz"
+            fi
+
+            ok=0
+            status_code=000
+            resp_tmp="$(mktemp)"
+            trap 'rm -f "$resp_tmp"' EXIT
+            for i in $(seq 1 15); do
+              sleep 4
+              status_code="$(curl -sS --max-time 4 --connect-timeout 2 -o "$resp_tmp" -w '%{http_code}' "$HEALTH_URL" || true)"
+              if [ "$status_code" = "200" ]; then
+                ok=1
+                break
+              fi
+            done
+
+            if [ "$ok" -ne 1 ]; then
+              echo "Healthcheck falhou (status $status_code). Corpo da resposta:" >&2
+              cat "$resp_tmp" >&2 || true
+              echo "------ docker compose ps ------" >&2
+              $COMPOSE_CMD -p "$COMPOSE_PROJECT" --env-file "$ENV_FILE" ps >&2 || true
+              echo "------ docker compose logs (tail 150) ------" >&2
+              $COMPOSE_CMD -p "$COMPOSE_PROJECT" --env-file "$ENV_FILE" logs --tail=150 >&2 || true
+              echo "Efetuando rollback..." >&2
+              if [ -n "$PREV_DIR" ] && [ -d "$PREV_DIR" ]; then
+                ln -sfn "$PREV_DIR" "$CUR_LINK"
+                cd "$PREV_DIR"
+                $COMPOSE_CMD -p "$COMPOSE_PROJECT" --env-file "$ENV_FILE" up -d --build --remove-orphans || true
+              fi
+              exit 1
+            fi
+
+            rm -f "$resp_tmp"
+
+            # limpeza de releases antigos (mantém 5)
+            ls -1dt "$BASE/releases"/* | tail -n +6 | xargs -r rm -rf
+
+          EOF

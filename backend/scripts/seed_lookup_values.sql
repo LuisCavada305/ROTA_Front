@@ -63,3 +63,12 @@ ON CONFLICT (code) DO NOTHING;
 -- SELECT setval('lk_sex_id_seq',       (SELECT COALESCE(MAX(id), 1) FROM lk_sex));
 -- SELECT setval('lk_color_id_seq',     (SELECT COALESCE(MAX(id), 1) FROM lk_color));
 -- Ajuste conforme necessário para cada sequência criada automaticamente.
+
+-- Índices de apoio (idempotentes para ambientes que reaplicam o seed)
+CREATE INDEX IF NOT EXISTS idx_trails_created_date ON public.trails (created_date DESC);
+CREATE INDEX IF NOT EXISTS idx_trails_name ON public.trails ("name");
+CREATE INDEX IF NOT EXISTS idx_user_trails_user_status ON public.user_trails (user_id, status_id);
+CREATE INDEX IF NOT EXISTS idx_trail_included_items_trail ON public.trail_included_items (trail_id, ord);
+CREATE INDEX IF NOT EXISTS idx_trail_requirements_trail ON public.trail_requirements (trail_id, ord);
+CREATE INDEX IF NOT EXISTS idx_trail_target_audience_trail ON public.trail_target_audience (trail_id, ord);
+CREATE INDEX IF NOT EXISTS idx_user_item_progress_status ON public.user_item_progress (status_id);

@@ -4,7 +4,7 @@
 from .base import Base  # noqa: F401
 
 # Lookup tables
-from .lookups import LkSex, LkRole  # noqa: F401
+from .lookups import LkSex, LkRole, LkColor  # noqa: F401
 from .lk_item_type import LkItemType  # noqa: F401
 from .lk_enrollment_status import LkEnrollmentStatus  # noqa: F401
 from .lk_progress_status import LkProgressStatus  # noqa: F401
@@ -19,6 +19,7 @@ from .trail_included_items import TrailIncludedItems  # noqa: F401
 from .trail_requirements import TrailRequirements  # noqa: F401
 from .trail_target_audience import TrailTargetAudience  # noqa: F401
 from .trail_certificates import TrailCertificates  # noqa: F401
+from .forums import Forum, ForumTopic, ForumPost  # noqa: F401
 
 # Progress / enrollment models
 from .user_trails import UserTrails  # noqa: F401

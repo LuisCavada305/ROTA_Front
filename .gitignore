@@ -1,0 +1,9 @@
+# Backend runtime artifacts
+backend/.env
+backend/certs/
+backend/frontend_dist/
+backend/.venv/
+
+# Frontend build output
+frontend/node_modules/
+frontend/dist/

@@ -178,6 +178,8 @@ CREATE TABLE public.trails (
     target_audience TEXT[],
     included_items  TEXT[]
 );
+CREATE INDEX idx_trails_created_date ON public.trails (created_date DESC);
+CREATE INDEX idx_trails_name ON public.trails ("name");
 
 -- DROP TABLE public.user_trails;
 CREATE TABLE public.user_trails (
@@ -198,6 +200,7 @@ CREATE TABLE public.user_trails (
 );
 CREATE INDEX idx_user_trails_user ON public.user_trails (user_id);
 CREATE INDEX idx_user_trails_trail ON public.user_trails (trail_id);
+CREATE INDEX idx_user_trails_user_status ON public.user_trails (user_id, status_id);
 
 -- DROP TABLE public.forums;
 CREATE TABLE public.forums (
@@ -232,6 +235,7 @@ CREATE TABLE public.trail_included_items (
     text_val VARCHAR(500) NOT NULL,
     ord      INT NOT NULL DEFAULT 0
 );
+CREATE INDEX idx_trail_included_items_trail ON public.trail_included_items (trail_id, ord);
 
 -- DROP TABLE public.trail_requirements;
 CREATE TABLE public.trail_requirements (
@@ -240,6 +244,7 @@ CREATE TABLE public.trail_requirements (
     text_val VARCHAR(500) NOT NULL,
     ord      INT NOT NULL DEFAULT 0
 );
+CREATE INDEX idx_trail_requirements_trail ON public.trail_requirements (trail_id, ord);
 
 -- DROP TABLE public.trail_sections;
 CREATE TABLE public.trail_sections (
@@ -261,6 +266,7 @@ CREATE TABLE public.trail_target_audience (
     text_val VARCHAR(500) NOT NULL,
     ord      INT NOT NULL DEFAULT 0
 );
+CREATE INDEX idx_trail_target_audience_trail ON public.trail_target_audience (trail_id, ord);
 
 -- DROP TABLE public.forum_topics;
 CREATE TABLE public.forum_topics (
@@ -314,6 +320,7 @@ CREATE TABLE public.user_item_progress (
 CREATE INDEX idx_uip_user ON public.user_item_progress (user_id);
 CREATE INDEX idx_uip_item ON public.user_item_progress (trail_item_id);
 CREATE INDEX idx_user_item_progress_user_trail ON public.user_item_progress (user_id, trail_item_id);
+CREATE INDEX idx_user_item_progress_status ON public.user_item_progress (status_id);
 
 -- DROP TABLE public.forms;
 CREATE TABLE public.forms (

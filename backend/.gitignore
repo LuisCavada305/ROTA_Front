@@ -1,0 +1,14 @@
+venv/
+.env
+__pycache__/
+.vscode/
+certs/
+*.pem
+results.json
+metric.json
+db_results.json
+perf_progress_mem.csv
+performance/progress_probe_results.json
+performance/rps_results.json
+scripts/monitor_memory.py
+frontend_dist/

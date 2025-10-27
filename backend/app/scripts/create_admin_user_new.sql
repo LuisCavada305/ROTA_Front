@@ -6,7 +6,7 @@ WITH lookups AS (
   SELECT
     (SELECT id FROM lk_role WHERE code = 'Admin') AS admin_role_id,
     (SELECT id FROM lk_sex WHERE code IN ('N', 'NS') ORDER BY code LIMIT 1) AS default_sex_id,
-    (SELECT id FROM lk_skin_color ORDER BY id LIMIT 1) AS default_color_id
+    (SELECT id FROM lk_color ORDER BY id LIMIT 1) AS default_color_id
 )
 INSERT INTO users (
   email,

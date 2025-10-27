@@ -54,8 +54,8 @@ services:
         condition: service_healthy
     environment:
       ENV: production
-      API_ORIGIN: https://app.seudominio.com.br
-      CORS_ALLOWED_ORIGINS: https://app.seudominio.com.br
+      API_ORIGIN: https://app.72-61-32-2.nip.io
+      CORS_ALLOWED_ORIGINS: https://app.72-61-32-2.nip.io
       DB_ENGINE: postgresql+psycopg
       DB_HOST: db
       DB_PORT: 5432

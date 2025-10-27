@@ -2,10 +2,11 @@
 -- Email: rota.admin@rota.dev
 -- Senha: NovaSenha!2025
 
-WITH role_ids AS (
+WITH lookups AS (
   SELECT
     (SELECT id FROM lk_role WHERE code = 'Admin') AS admin_role_id,
-    (SELECT id FROM lk_sex WHERE code IN ('N', 'NS') ORDER BY code LIMIT 1) AS default_sex_id
+    (SELECT id FROM lk_sex WHERE code IN ('N', 'NS') ORDER BY code LIMIT 1) AS default_sex_id,
+    (SELECT id FROM lk_skin_color ORDER BY id LIMIT 1) AS default_color_id
 )
 INSERT INTO users (
   email,
@@ -22,11 +23,13 @@ SELECT
   'Administrador ROTA',
   'rota_superadmin',
   DATE '1992-05-15',
-  role_ids.default_sex_id,
-  role_ids.admin_role_id
-FROM role_ids
-WHERE role_ids.admin_role_id IS NOT NULL
-  AND role_ids.default_sex_id IS NOT NULL
+  lookups.default_sex_id,
+  lookups.admin_role_id,
+  lookups.default_color_id
+FROM lookups
+WHERE lookups.admin_role_id IS NOT NULL
+  AND lookups.default_sex_id IS NOT NULL
+  AND lookups.default_color_id IS NOT NULL
   AND NOT EXISTS (
     SELECT 1
     FROM users

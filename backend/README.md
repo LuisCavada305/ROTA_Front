@@ -28,6 +28,7 @@ parâmetros seguros configuráveis por variáveis de ambiente.
 | `DB_ENGINE`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS` | opcional | Componentes para montar a URL do banco. Em produção não utilize os valores padrão. |
 | `JWT_SECRET` | **sim** | Chave usada para assinar sessões e tokens. Deve ter >=16 caracteres e não pode ser trivial. |
 | `CSRF_SECRET` | recomendado | Segredo dedicado para assinar tokens CSRF. Obrigatório em produção. |
+| `COOKIE_DOMAIN` | recomendado | Domínio compartilhado (ex.: `.seu-dominio.com`). Necessário quando API e app usam subdomínios diferentes para que `rota_session`/`rota_csrftoken` sejam lidos pelo front. |
 | `CORS_ALLOWED_ORIGINS` | opcional | Lista separada por vírgulas de origens permitidas. Defaults seguros para `localhost`. |
 | `REDIS_URL` | recomendado | URL do Redis (`redis://user:pass@host:6379/0`). Se não informado cai no limitador em memória. |
 | `AUTH_RATE_LIMIT_MAX_ATTEMPTS` | opcional | Tentativas permitidas por janela (default `10`). |

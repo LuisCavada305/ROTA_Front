@@ -97,6 +97,7 @@ def set_session_cookie(res: Response, token: str, remember: bool):
     max_age = 1 * 24 * 60 * 60 if remember else None
     secure_flag = _secure_cookie_flag()
     samesite_mode = "none" if secure_flag else "lax"
+    domain = settings.COOKIE_DOMAIN
     res.set_cookie(
         key=settings.COOKIE_NAME,
         value=token,
@@ -105,18 +106,21 @@ def set_session_cookie(res: Response, token: str, remember: bool):
         secure=secure_flag,
         path="/",
         max_age=max_age,
+        domain=domain,
     )
 
 
 def clear_session_cookie(res: Response):
     secure_flag = _secure_cookie_flag()
     samesite_mode = "none" if secure_flag else "lax"
+    domain = settings.COOKIE_DOMAIN
     res.delete_cookie(
         key=settings.COOKIE_NAME,
         httponly=True,
         samesite=samesite_mode,
         secure=secure_flag,
         path="/",
+        domain=domain,
     )
 
 
@@ -142,6 +146,7 @@ def set_csrf_cookie(res: Response, token: str, remember: bool):
     max_age = 1 * 24 * 60 * 60 if remember else None
     secure_flag = _secure_cookie_flag()
     samesite_mode = "none" if secure_flag else "lax"
+    domain = settings.COOKIE_DOMAIN
     res.set_cookie(
         key=settings.CSRF_COOKIE_NAME,
         value=token,
@@ -150,18 +155,21 @@ def set_csrf_cookie(res: Response, token: str, remember: bool):
         secure=secure_flag,
         path="/",
         max_age=max_age,
+        domain=domain,
     )
 
 
 def clear_csrf_cookie(res: Response):
     secure_flag = _secure_cookie_flag()
     samesite_mode = "none" if secure_flag else "lax"
+    domain = settings.COOKIE_DOMAIN
     res.delete_cookie(
         key=settings.CSRF_COOKIE_NAME,
         httponly=False,
         samesite=samesite_mode,
         secure=secure_flag,
         path="/",
+        domain=domain,
     )
 
 

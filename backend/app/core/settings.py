@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     JWT_SECRET: str = Field(env="JWT_SECRET")
     CSRF_SECRET: str | None = Field(default=None, env="CSRF_SECRET")
     COOKIE_NAME: str = Field(default="rota_session", env="COOKIE_NAME")
+    COOKIE_DOMAIN: str | None = Field(default=None, env="COOKIE_DOMAIN")
     CSRF_COOKIE_NAME: str = Field(default="rota_csrf", env="CSRF_COOKIE_NAME")
     ENV: str = Field(default="dev", env="ENV")
 

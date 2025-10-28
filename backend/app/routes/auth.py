@@ -185,7 +185,7 @@ def login():
     user: User | None = repo.GetUserByEmail(payload.email)
 
     if not user or not verify_password(payload.password, user.password_hash):
-        abort(401, description="Credenciais inválidas")
+        return jsonify({"detail": "Credenciais inválidas. Verifique seu email e senha."}), 401
 
     token = sign_session(
         {

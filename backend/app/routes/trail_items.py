@@ -541,6 +541,7 @@ def submit_form(trail_id: int, item_id: int):
             user.user_id,
             item.id,
             "COMPLETED",
+            trail_id=item.trail_id,
             last_passed_submission_id=submission.id,
         )
 

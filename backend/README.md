@@ -9,16 +9,63 @@ parâmetros seguros configuráveis por variáveis de ambiente.
 - Python 3.12+
 - PostgreSQL 13+ (para desenvolvimento rápido é possível usar SQLite)
 - Redis 6+ para rate limiting distribuído (opcional, recomendado em produção)
+- Docker + Docker Compose (para quem preferir rodar tudo containerizado)
 
-## Configuração rápida
+## Como rodar localmente
 
-1. Crie e ative um virtualenv.
-2. Instale as dependências: `pip install -r requirements.txt`
-3. Copie o arquivo `.env.example` para `.env` e ajuste os valores.
-4. Execute as migrações/tabelas iniciais conforme scripts existentes.
-5. Suba o servidor: `flask --app app.main run` (ou simplesmente `make`, que roda o alvo `run`).
+### 1. Preparar variáveis de ambiente
 
-> O `make` já lê as variáveis do arquivo `.env`; se ele não existir, copie o `.env.example`.
+Dentro de `backend/` copie o exemplo e ajuste o que for necessário:
+
+```bash
+cd backend
+cp .env.example .env
+# edite o arquivo e defina segredos (JWT_SECRET, CSRF_SECRET etc.)
+```
+
+Em desenvolvimento você pode usar SQLite (`DATABASE_URL=sqlite:///rota.db`) ou apontar para
+um Postgres local.
+
+### 2. Rodar em ambiente Python (sem Docker)
+
+1. Crie e ative um virtualenv:
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate
+   ```
+2. Instale as dependências:
+   ```bash
+   pip install -r requirements.txt
+   ```
+3. Crie as tabelas executando os scripts em `app/scripts` (o `bootstrap_schema.sql` monta toda
+   a estrutura). Com Postgres local:
+   ```bash
+   psql postgres://usuario:senha@localhost:5432/rota-db -f app/scripts/bootstrap_schema.sql
+   psql postgres://usuario:senha@localhost:5432/rota-db -f app/scripts/seed_lookup_values.sql
+   ```
+   > Para SQLite basta rodar `python -m app.scripts.bootstrap_schema` (executável no `make bootstrap`).
+4. Execute o servidor:
+   ```bash
+   make  # alvo padrão roda `flask --app app.main run --debug`
+   ```
+
+### 3. Rodar usando Docker Compose (Postgres + Redis + API)
+
+1. Garanta que Docker e Docker Compose plugin estejam instalados.
+2. Ainda dentro de `backend/`, suba os serviços:
+   ```bash
+   docker compose --env-file .env up -d --build
+   ```
+3. A primeira vez que os containers forem iniciados o Postgres lerá os arquivos de
+   `app/scripts` automaticamente. Se precisar reaplicar, execute:
+   ```bash
+   docker compose exec db psql -U rota-user -d rota-db -f /docker-entrypoint-initdb.d/bootstrap_schema.sql
+   docker compose exec db psql -U rota-user -d rota-db -f /docker-entrypoint-initdb.d/seed_lookup_values.sql
+   ```
+4. A API ficará disponível em `http://localhost:8000`. Para derrubar tudo:
+   ```bash
+   docker compose down
+   ```
 
 ### Uploads locais
 
@@ -34,7 +81,8 @@ e ajuste as permissões para o usuário que executa a API:
 
 ```bash
 sudo mkdir -p /opt/rota/uploads/{members,trails}
-sudo chown -R www-data:www-data /opt/rota/uploads
+# a imagem executa como UID/GID 1000 (appuser); ajuste as permissões para corresponder:
+sudo chown -R 1000:1000 /opt/rota/uploads
 sudo chmod 750 /opt/rota/uploads
 ```
 
@@ -53,6 +101,10 @@ sudo chmod 750 /opt/rota/uploads
 | `AUTH_RATE_LIMIT_WINDOW_SECONDS` | opcional | Duração da janela de rate limiting (default `60`). |
 | `SMTP_*` | opcional | Configurações de e-mail transactional. |
 | `ENV` | opcional | Define o ambiente (`dev`, `staging`, `prod`). Em `prod` validações extras são aplicadas. |
+| `DD_TRACE_ENABLED` | opcional | Defina `1` para ativar tracing via Datadog. Sem agente em execução deixe `0`. |
+| `DD_API_KEY` | opcional | Chave da sua conta Datadog. Obrigatória quando o agente estiver habilitado. |
+| `DD_SITE` | opcional | Região Datadog (ex.: `datadoghq.com`, `datadoghq.eu`). Default `datadoghq.com`. |
+| `DD_ENV`, `DD_VERSION` | opcional | Metadados para agrupamento de métricas/traces no Datadog. |
 
 > **Importante:** ao definir `ENV=prod` o aplicativo bloqueia o uso das credenciais padrão
 > e exige `CSRF_SECRET`. Configure também HTTPS terminado no proxy ou load balancer
@@ -121,12 +173,178 @@ Para publicar o front:
 
 Com isso o portal fica acessível em `https://app.seu-dominio` e a API em `https://api.seu-dominio`, ambos servidos pelo mesmo Nginx com TLS.
 
+## Preparando a VPS para a pipeline
+
+As etapas a seguir deixam a infraestrutura pronta para que a *pipeline* (GitHub Actions)
+consiga fazer o deploy sem intervenção manual. Execute-as apenas na primeira vez em uma
+VPS Ubuntu 22.04+ recém-provisionada.
+
+### 1. Instale dependências básicas
+
+```bash
+sudo apt update
+sudo apt install -y git curl ufw
+curl -fsSL https://get.docker.com | sudo sh
+sudo usermod -aG docker $USER
+sudo apt install -y docker-compose-plugin
+```
+
+Faça logout/login para ativar o grupo `docker`.
+
+### 2. Estruture os diretórios
+
+```bash
+sudo mkdir -p /opt/rota/{backend/releases,uploads/{members,trails},certs}
+sudo chown -R $USER:$USER /opt/rota
+```
+
+> Após copiar os arquivos do projeto, ajuste novamente a pasta `uploads/` para UID/GID `1000:1000`:
+>
+> ```bash
+> sudo chown -R 1000:1000 /opt/rota/uploads
+> sudo chmod 750 /opt/rota/uploads
+> ```
+
+> O diretório `uploads/` deve sempre pertencer ao mesmo usuário que roda os containers, pois é montado em `/opt/app/app/static/uploads`.
+>
+> A pipeline assume que `/opt/rota/backend/current` aponta para o release ativo e que o
+> volume `/opt/rota/uploads` já existe com as permissões acima.
+
+### 3. Obtenha o projeto
+
+Se você já rodou a pipeline pelo menos uma vez, ela cuidará de criar o primeiro release em
+`/opt/rota/backend/releases/<timestamp>/` e atualizar o symlink `current`. Caso queira
+conferir tudo antes de liberar o deploy automatizado, faça um clone manual:
+
+```bash
+cd /opt/rota/backend/releases
+git clone https://seu-repo.git 20250101120000
+ln -sfn 20250101120000 ../current
+```
+
+Independentemente da abordagem, as etapas seguintes consideram
+`/opt/rota/backend/current` como caminho ativo.
+
+### 4. Configure variáveis de ambiente
+
+Dentro de `current/backend/` copie e edite:
+
+```bash
+cd /opt/rota/backend/current/backend
+cp .env.example ../.env
+nano ../.env  # defina JWT_SECRET, CSRF_SECRET, DATABASE_URL etc.
+```
+
+No VPS apontamos `DATABASE_URL` para o Postgres gerenciado (ou para o container `db` caso use o compose completo).
+
+### 5. Prepare certificados e build do front-end
+
+1. Copie `frontend/dist/` gerado localmente para `backend/frontend_dist/`:
+   ```bash
+   rsync -az ../frontend/dist/ /opt/rota/backend/current/backend/frontend_dist/
+   ```
+2. Coloque `server.crt` e `server.key` válidos em `/opt/rota/backend/current/certs/`.
+
+### 6. Criar o banco de dados (apenas primeira vez)
+
+Com o Postgres do compose:
+
+```bash
+docker compose -p rota_backend exec db psql -U rota-user -d rota-db -f /docker-entrypoint-initdb.d/bootstrap_schema.sql
+docker compose -p rota_backend exec db psql -U rota-user -d rota-db -f /docker-entrypoint-initdb.d/seed_lookup_values.sql
+docker compose -p rota_backend exec db psql -U rota-user -d rota-db -f /docker-entrypoint-initdb.d/create_admin_user_new.sql
+```
+
+Se estiver usando Postgres externo, copie os SQLs para o servidor e execute com `psql`.
+
+### 7. Rodar a pipeline
+
+Com todos os pré-requisitos acima atendidos:
+
+1. Faça commit das alterações (backend e frontend) no repositório.
+2. Abra um *pull request* ou faça push para o branch monitorado pela pipeline.
+3. Aguarde a conclusão da ação (ex.: `Deploy backend`). Ela cuidará de:
+   - gerar um release em `/opt/rota/backend/releases/<timestamp>/`;
+   - atualizar o symlink `current`;
+   - rodar `docker compose -p rota_backend --env-file ../.env up -d --build`;
+   - executar ajustes pós-deploy definidos no workflow.
+4. Verifique o status em GitHub Actions e, se necessário, revise os logs via
+   `docker compose -p rota_backend logs -f api`.
+
+### 8. Secrets da pipeline (GitHub Actions)
+
+Crie os seguintes *secrets* em **Settings → Secrets and variables → Actions** do repositório:
+
+| Secret | Obrigatório | Descrição e exemplo |
+| --- | --- | --- |
+| `DEPLOY_HOST` | sim | IP ou hostname público da VPS. Ex.: `72.61.32.2`. |
+| `DEPLOY_USER` | sim | Usuário SSH com permissão para rodar Docker e escrever em `/opt/rota`. Ex.: `deploy`. |
+| `DEPLOY_PATH` | sim | Caminho base usado pela pipeline. Ex.: `/opt/rota/backend`. |
+| `DOCKER_PROJECT` | opcional | Nome do projeto Compose (`-p`). Default do workflow: `rota_backend`. |
+| `HEALTHCHECK_URL` | opcional | URL completa usada após o deploy. Se vazio usa `http://127.0.0.1:8000/healthz`. |
+| `SSH_PRIVATE_KEY` | sim | Chave privada (formato PEM/OpenSSH) do usuário definido em `DEPLOY_USER`. A pública deve estar em `~/.ssh/authorized_keys` na VPS. |
+| `ENV_FILE_PROD` | opcional | Conteúdo do `.env` de produção (texto puro). Se setado, a pipeline sobrescreve `${DEPLOY_PATH}/.env`. Caso contrário mantenha o arquivo manualmente no servidor. |
+| `DD_API_KEY` | opcional | Caso prefira manter a chave Datadog fora do `.env`, informe-a aqui (a pipeline a exportará para o agente). |
+| `DD_SITE` | opcional | Região Datadog (`datadoghq.com`, `datadoghq.eu`, ...). Usada somente se `DD_API_KEY` estiver definido. |
+
+> Os secrets são lidos somente pelo workflow `deploy.yml`. Se for preciso acessar múltiplas VPS,
+> prefira reutilizar os nomes acima e armazenar os valores específicos em *environment secrets*
+> (ex.: `production`, `staging`) para simplificar o reuso.
+
+### 9. Manutenção diária
+
+- **Executar comandos administrativos** (migrações, shell, etc.):
+  ```bash
+  cd /opt/rota/backend/current/backend
+  docker compose -p rota_backend exec api flask --app app.main shell
+  ```
+- **Ver logs**: `docker compose -p rota_backend logs -f api proxy`
+- **Reiniciar serviço manualmente** (somente se a pipeline não estiver sendo executada):
+  ```bash
+  docker compose -p rota_backend restart api proxy
+  ```
+
+Certifique-se de manter backups do banco e renovar certificados TLS (ex.: via cron com Certbot).
+
 ## Rate limiting
 
 O serviço aplica rate limiting nas rotas sensíveis (login, registro, reset de senha). Por
 padrão utiliza um limitador em memória adequado para desenvolvimento. Quando `REDIS_URL`
 está configurado, o backend usa uma janela fixa com `ZSET` em Redis, permitindo múltiplas
 instâncias da aplicação sem perder o controle de tentativas.
+
+## Observabilidade (Datadog)
+
+O `docker-compose.yml` inclui um contêiner `datadog-agent` responsável por coletar:
+
+- logs de stdout/stderr dos serviços (API, proxy, etc.);
+- métricas e traces APM enviados automaticamente pelo `ddtrace` quando habilitado.
+
+Para ativar em produção:
+
+1. Defina no arquivo `.env` (ou no secret `ENV_FILE_PROD`) os valores:
+   ```
+   COMPOSE_PROFILES=datadog
+   DD_TRACE_ENABLED=1
+   DD_API_KEY=<sua-chave>
+   DD_SITE=datadoghq.com          # ou outra região
+   DD_ENV=production              # aparece nas tags do Datadog
+   DD_VERSION=<hash ou versão>    # opcional, para releases
+   ```
+2. Certifique-se de que o usuário que roda os containers tem permissão de ler:
+   - `/var/run/docker.sock`
+   - `/var/lib/docker/containers`
+   - `/proc` e `/sys/fs/cgroup`
+
+   Esses diretórios são montados pelo agente para coletar logs e métricas.
+
+3. Rode a pipeline normalmente. Ela reprovisionará a stack com o agente e a API
+   instrumentada via `ddtrace`. Se a chave estiver ausente, o serviço `datadog-agent`
+   falhará ao iniciar (o deploy será revertido pelo healthcheck).
+
+Para desativar temporariamente, deixe `COMPOSE_PROFILES` em branco (o agente não será
+subido) e ajuste `DD_TRACE_ENABLED=0`; a API continuará operando sem enviar dados ao
+Datadog.
 
 ## CORS e cookies
 

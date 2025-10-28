@@ -6,7 +6,7 @@ import "../styles/Trail.css";
 import Layout from "../components/Layout";
 import { useAuth } from "../hooks/AuthContext";
 
-const PROGRESS_SAVE_INTERVAL_MS = 15000; // 15s
+const PROGRESS_SAVE_INTERVAL_MS = 20000; // 20s
 
 /** ===== Tipos vindos do seu back ===== */
 type Item = {

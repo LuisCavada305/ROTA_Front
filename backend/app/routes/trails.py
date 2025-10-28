@@ -438,6 +438,7 @@ def set_item_progress(trail_id: int, item_id: int):
         progress_value=(
             effective_seconds if item_type == "VIDEO" else body.progress_value
         ),
+        trail_id=trail_id,
     )
     progress_snapshot = (
         user_trails_repo.get_progress_for_user(user.user_id, trail_id) or {}

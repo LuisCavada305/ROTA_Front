@@ -2,24 +2,33 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import Optional
 
-from app.models.user_item_progress import UserItemProgress as UserItemProgressORM
+from app.models.lk_progress_status import LkProgressStatus
 from app.models.lk_progress_status import LkProgressStatus as LkProgressStatusORM
 from app.models.trail_items import TrailItems as TrailItemsORM
-
-from app.models.lk_progress_status import LkProgressStatus
+from app.models.user_item_progress import UserItemProgress as UserItemProgressORM
 from app.repositories.UserTrailsRepository import UserTrailsRepository
 
 
 class UserProgressRepository:
+    _STATUS_ID_CACHE: dict[str, int] = {}
+
     def __init__(self, db: Session):
         self.db = db
 
     def _status_id(self, code: str) -> int:
-        return (
+        cached = self._STATUS_ID_CACHE.get(code)
+        if cached is not None:
+            return cached
+
+        status_id = (
             self.db.query(LkProgressStatus.id)
             .filter(LkProgressStatusORM.code == code)
             .scalar()
         )
+        if status_id is None:
+            raise LookupError(f"Progress status '{code}' not found.")
+        self._STATUS_ID_CACHE[code] = status_id
+        return status_id
 
     def upsert_item_progress(
         self,
@@ -28,19 +37,12 @@ class UserProgressRepository:
         status_code: str,
         progress_value: int | None = None,
         *,
+        trail_id: int | None = None,
         last_passed_submission_id: Optional[int] = None,
     ):
         status_id = self._status_id(status_code)
         completed_status_id = self._status_id("COMPLETED")
-        sanitized_progress = (
-            max(0, progress_value) if progress_value is not None else None
-        )
-        progress_update_flag = sanitized_progress is not None
-        last_passed_update_flag = last_passed_submission_id is not None
-
-        sanitized_progress = (
-            max(0, progress_value) if progress_value is not None else None
-        )
+        sanitized_progress = max(0, progress_value) if progress_value is not None else None
 
         now_sql = text("SELECT now(), now()")
         now_result = self.db.execute(now_sql).one()
@@ -161,13 +163,15 @@ class UserProgressRepository:
 
         uip = self.db.get(UserItemProgressORM, uip_id)
 
-        trail_id = (
-            self.db.query(TrailItemsORM.trail_id)
-            .filter(TrailItemsORM.id == item_id)
-            .scalar()
-        )
-        if trail_id is not None:
-            UserTrailsRepository(self.db).sync_user_trail_progress(user_id, trail_id)
+        resolved_trail_id = trail_id
+        if resolved_trail_id is None:
+            resolved_trail_id = (
+                self.db.query(TrailItemsORM.trail_id)
+                .filter(TrailItemsORM.id == item_id)
+                .scalar()
+            )
+        if resolved_trail_id is not None:
+            UserTrailsRepository(self.db).sync_user_trail_progress(user_id, resolved_trail_id)
 
         self.db.commit()
         return uip

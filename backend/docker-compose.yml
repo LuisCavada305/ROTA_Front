@@ -78,7 +78,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ../uploads:/opt/app/app/static/uploads
+      - /opt/rota/uploads:/opt/app/app/static/uploads
     restart: unless-stopped
     networks:
       - backend

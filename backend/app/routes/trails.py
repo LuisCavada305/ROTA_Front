@@ -166,6 +166,9 @@ def get_trails():
         {
             "trails": data,
             "pagination": _build_pagination_metadata(page, page_size, total),
+            "certificate": None,
+            "review_rating": None,
+            "review_comment": None,
         }
     )
 
@@ -427,7 +430,8 @@ def set_item_progress(trail_id: int, item_id: int):
                 )
 
     user_trails_repo.ensure_enrollment(user.user_id, trail_id)
-    UserProgressRepository(db).upsert_item_progress(
+    progress_repo = UserProgressRepository(db)
+    progress_repo.upsert_item_progress(
         user.user_id,
         item_id,
         body.status,
@@ -435,4 +439,32 @@ def set_item_progress(trail_id: int, item_id: int):
             effective_seconds if item_type == "VIDEO" else body.progress_value
         ),
     )
-    return jsonify({"ok": True})
+    progress_snapshot = (
+        user_trails_repo.get_progress_for_user(user.user_id, trail_id) or {}
+    )
+    if not progress_snapshot:
+        total_items = user_trails_repo.count_items_in_trail(trail_id)
+        progress_snapshot = {
+            "done": 0,
+            "total": total_items,
+            "computed_progress_percent": 0.0,
+            "nextAction": "Começar",
+            "enrolledAt": None,
+            "status": None,
+            "completed_at": None,
+            "certificate": None,
+            "review_rating": None,
+            "review_comment": None,
+        }
+
+    items_snapshot = user_trails_repo.get_items_progress(user.user_id, trail_id)
+    sections_snapshot = user_trails_repo.get_sections_progress(user.user_id, trail_id)
+
+    return jsonify(
+        {
+            "ok": True,
+            "progress": progress_snapshot,
+            "items_progress": items_snapshot,
+            "sections_progress": sections_snapshot,
+        }
+    )

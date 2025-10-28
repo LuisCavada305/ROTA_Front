@@ -112,6 +112,13 @@ type SectionProgress = {
   percent: number;
 };
 
+type ProgressSnapshotPayload = {
+  ok?: boolean;
+  progress?: ProgressTotal | null;
+  items_progress?: ItemProgress[];
+  sections_progress?: SectionProgress[];
+};
+
 function YouTubePlayer({
   videoId,
   startAt = 0,
@@ -516,6 +523,70 @@ export default function Trail() {
   const [certLoading, setCertLoading] = useState(false);
   const [certError, setCertError] = useState<string | null>(null);
 
+  const computeFallbackProgress = useCallback((): ProgressTotal => {
+    const totalItems = sectionsRef.current.reduce(
+      (acc, sec) => acc + (sec.items?.length ?? 0),
+      0
+    );
+    return {
+      done: 0,
+      total: totalItems,
+      computed_progress_percent: 0,
+      nextAction: "Começar",
+      enrolledAt: null,
+      status: null,
+      completed_at: null,
+    };
+  }, []);
+
+  const normalizeProgress = useCallback(
+    (raw: ProgressSnapshotPayload["progress"]): ProgressTotal => {
+      const fallback = computeFallbackProgress();
+      if (raw && typeof raw === "object") {
+        return {
+          ...fallback,
+          ...raw,
+          done: typeof raw.done === "number" ? raw.done : fallback.done,
+          total: typeof raw.total === "number" ? raw.total : fallback.total,
+          computed_progress_percent:
+            typeof raw.computed_progress_percent === "number"
+              ? raw.computed_progress_percent
+              : fallback.computed_progress_percent,
+          nextAction:
+            typeof raw.nextAction === "string" && raw.nextAction.length > 0
+              ? raw.nextAction
+              : fallback.nextAction,
+          enrolledAt: raw.enrolledAt ?? fallback.enrolledAt,
+          status: raw.status ?? fallback.status,
+          completed_at: raw.completed_at ?? fallback.completed_at,
+        };
+      }
+      return fallback;
+    },
+    [computeFallbackProgress]
+  );
+
+  const applyProgressSnapshot = useCallback(
+    (snapshot: ProgressSnapshotPayload | null) => {
+      if (!snapshot) return;
+
+      if ("progress" in snapshot) {
+        setProgress(normalizeProgress(snapshot.progress));
+      }
+
+      if (Array.isArray(snapshot.items_progress)) {
+        const itemEntries = snapshot.items_progress.map((ip) => [ip.item_id, ip] as const);
+        setItemProgress(Object.fromEntries(itemEntries));
+      }
+
+      if (Array.isArray(snapshot.sections_progress)) {
+        const sectionEntries = snapshot.sections_progress.map((sp) => [sp.section_id, sp] as const);
+        setSectionProgress(Object.fromEntries(sectionEntries));
+      }
+    },
+    [normalizeProgress]
+  );
+
   // quais sections estão abertas (expandidas)
   const [openSections, setOpenSections] = useState<Set<number>>(new Set());
 
@@ -582,32 +653,24 @@ export default function Trail() {
         http.get<SectionProgress[]>(`/user-trails/${trailId}/sections-progress`),
       ]);
 
-      setProgress(trailRes.data ?? null);
-
-      const itemEntries = (itemsRes.data ?? []).map((ip) => [ip.item_id, ip] as const);
-      setItemProgress(Object.fromEntries(itemEntries));
-
-      const sectionEntries = (sectionsRes.data ?? []).map((sp) => [sp.section_id, sp] as const);
-      setSectionProgress(Object.fromEntries(sectionEntries));
+      applyProgressSnapshot({
+        progress: trailRes.data ?? null,
+        items_progress: itemsRes.data ?? [],
+        sections_progress: sectionsRes.data ?? [],
+      });
     } catch (error) {
       const status = (error as any)?.response?.status;
       if (status === 401) {
-        const fallbackTotal = sectionsRef.current.reduce((acc, sec) => acc + (sec.items?.length ?? 0), 0);
-        setProgress({ done: 0, total: fallbackTotal, computed_progress_percent: 0, nextAction: "Começar" });
+        setProgress(normalizeProgress(null));
         setItemProgress({});
         setSectionProgress({});
         return;
       }
       // eslint-disable-next-line no-console
       console.error("Falha ao carregar progresso da trilha", error);
-      setProgress((prev) => prev ?? {
-        done: 0,
-        total: sectionsRef.current.reduce((acc, sec) => acc + (sec.items?.length ?? 0), 0),
-        computed_progress_percent: 0,
-        nextAction: "Começar",
-      });
+      setProgress((prev) => prev ?? normalizeProgress(null));
     }
-  }, [trailId]);
+  }, [trailId, applyProgressSnapshot, normalizeProgress]);
 
   useEffect(() => {
     if (!sections.length) {
@@ -995,11 +1058,14 @@ export default function Trail() {
         if (isMountedRef.current) {
           setSaving(true);
         }
-        await http.put(`/trails/${trailId}/items/${detail.id}/progress`, {
-          status: canComplete ? "COMPLETED" : "IN_PROGRESS",
-          progress_value: Math.floor(watchedSeconds), // segundos assistidos
-        });
-        await loadProgress();
+        const response = await http.put<ProgressSnapshotPayload>(
+          `/trails/${trailId}/items/${detail.id}/progress`,
+          {
+            status: canComplete ? "COMPLETED" : "IN_PROGRESS",
+            progress_value: Math.floor(watchedSeconds), // segundos assistidos
+          }
+        );
+        applyProgressSnapshot(response.data);
       } catch {
         // noop: manter UX silenciosa
       } finally {
@@ -1009,7 +1075,7 @@ export default function Trail() {
         }
       }
     })();
-  }, [watchedSeconds, canComplete, trailId, detail, loadProgress]);
+  }, [watchedSeconds, canComplete, trailId, detail, applyProgressSnapshot]);
 
   if (loading || !progress) {
     return <div className="lesson-page loading">Carregando…</div>;
@@ -1180,13 +1246,16 @@ export default function Trail() {
                   onClick={async () => {
                     try {
                       setSaving(true);
-                      await http.put(`/trails/${trailId}/items/${detail.id}/progress`, {
-                        status: "COMPLETED",
-                        progress_value: detail.type === "VIDEO"
-                          ? Math.floor(watchedSeconds)
-                          : null,
-                      });
-                      await loadProgress();
+                      const response = await http.put<ProgressSnapshotPayload>(
+                        `/trails/${trailId}/items/${detail.id}/progress`,
+                        {
+                          status: "COMPLETED",
+                          progress_value: detail.type === "VIDEO"
+                            ? Math.floor(watchedSeconds)
+                            : null,
+                        }
+                      );
+                      applyProgressSnapshot(response.data);
                     } finally {
                       setSaving(false);
                     }

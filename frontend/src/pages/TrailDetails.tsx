@@ -297,7 +297,7 @@ export default function TrailDetails() {
           id: core.id,
           title,
           category,
-          thumbnail_url: core.thumbnail_url,
+          thumbnail_url: core.thumbnail_url ?? null,
           description,
           learn,
           sections: orderedSections,

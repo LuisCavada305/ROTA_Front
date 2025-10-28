@@ -25,11 +25,11 @@ RUN useradd --create-home --shell /bin/bash appuser \
 
 USER appuser
 
-ENV UVICORN_WORKERS=4 \
+ENV UVICORN_WORKERS=2 \
     UVICORN_KEEP_ALIVE=5 \
     UVICORN_HOST=0.0.0.0 \
     UVICORN_PORT=8000
 
 EXPOSE 8000
 
-CMD ["sh", "-c", "uvicorn app.asgi:app --host ${UVICORN_HOST:-0.0.0.0} --port ${UVICORN_PORT:-8000} --workers ${UVICORN_WORKERS:-4} --timeout-keep-alive ${UVICORN_KEEP_ALIVE:-60} --proxy-headers --forwarded-allow-ips '*'"]
+CMD ["sh", "-c", "uvicorn app.asgi:app --host ${UVICORN_HOST:-0.0.0.0} --port ${UVICORN_PORT:-8000} --workers ${UVICORN_WORKERS:-2} --timeout-keep-alive ${UVICORN_KEEP_ALIVE:-60} --proxy-headers --forwarded-allow-ips '*'"]

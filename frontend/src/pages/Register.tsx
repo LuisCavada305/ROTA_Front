@@ -45,7 +45,7 @@ export default function Register() {
         setLoading(true);
 
         if (!sex || !color) {
-            setErr("Selecione uma opção de gênero e de cor/raça.");
+            setErr("Selecione uma opção de gênero e de etnia.");
             setLoading(false);
             return;
         }
@@ -154,7 +154,7 @@ export default function Register() {
                                     required
                                     onChange={(e) => setColor(e.target.value as SkinColor)}
                                 >
-                                    <option value="" disabled>Com qual cor/raça você se identifica?</option>
+                                    <option value="" disabled>Com qual etnia você se identifica?</option>
                                     {skinColorOptions.map(opt => (
                                     <option key={opt.value} value={opt.value}>{opt.label}</option>
                                     ))}

@@ -1,7 +1,7 @@
 export type Trilha = {
   id: number;
   name: string;
-  thumbnail_url: string;
+  thumbnail_url?: string | null;
   author?: string;
   review?: number;          // 0..5
   review_count?: number;

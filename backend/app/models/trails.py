@@ -17,7 +17,7 @@ class Trails(Base):
     __tablename__ = "trails"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    thumbnail_url: Mapped[str] = mapped_column(String, nullable=False)
+    thumbnail_path: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     name: Mapped[str] = mapped_column(String, nullable=False)
     review: Mapped[Optional[float]] = mapped_column(
         Numeric(asdecimal=False), nullable=True
@@ -45,3 +45,12 @@ class Trails(Base):
     forums: Mapped[List["Forum"]] = relationship(
         back_populates="trail", cascade="all, delete-orphan"
     )
+
+    @property
+    def thumbnail_url(self) -> Optional[str]:
+        try:
+            from app.services.media import build_media_url
+
+            return build_media_url(self.thumbnail_path, external=True)
+        except RuntimeError:
+            return None

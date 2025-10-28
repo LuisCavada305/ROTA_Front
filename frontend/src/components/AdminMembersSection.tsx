@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { Edit3, Link2, Loader2, Trash2, UserCircle2 } from "lucide-react";
+import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
+import { Edit3, ImageOff, ImagePlus, Loader2, Trash2, UserCircle2 } from "lucide-react";
 import { http } from "../lib/http";
 import type { Member, MembersResponse } from "../types/member";
 import "../styles/AdminMembers.css";
@@ -10,7 +10,8 @@ type FormState = {
   role: string;
   bio: string;
   order_index: string;
-  photo_url: string;
+  photo_path: string | null;
+  photo_url: string | null;
 };
 
 const EMPTY_FORM: FormState = {
@@ -19,7 +20,8 @@ const EMPTY_FORM: FormState = {
   role: "",
   bio: "",
   order_index: "",
-  photo_url: "",
+  photo_path: null,
+  photo_url: null,
 };
 
 const DEFAULT_BADGE = "Membro Enactus Mackenzie";
@@ -41,6 +43,7 @@ export default function AdminMembersSection() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -92,7 +95,8 @@ export default function AdminMembersSection() {
       role: member.role ?? "",
       bio: member.bio ?? "",
       order_index: String(member.order_index ?? ""),
-      photo_url: member.photo_url ?? "",
+      photo_path: member.photo_path ?? null,
+      photo_url: member.photo_url ?? null,
     });
     setSaveError(null);
   };
@@ -121,7 +125,40 @@ export default function AdminMembersSection() {
     }
   };
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handlePhotoSelect = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setUploadingPhoto(true);
+    setSaveError(null);
+    try {
+      const data = new FormData();
+      data.append("file", file);
+      const response = await http.post<{ path: string; url: string }>(
+        "/admin/uploads/members",
+        data
+      );
+      setForm((prev) => ({
+        ...prev,
+        photo_path: response.data.path,
+        photo_url: response.data.url ?? null,
+      }));
+    } catch (err: any) {
+      const detail =
+        err?.response?.data?.detail ??
+        err?.message ??
+        "Não foi possível enviar a imagem.";
+      setSaveError(detail);
+    } finally {
+      setUploadingPhoto(false);
+      event.target.value = "";
+    }
+  };
+
+  const handleRemovePhoto = () => {
+    setForm((prev) => ({ ...prev, photo_path: null, photo_url: null }));
+  };
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!form.full_name.trim()) {
       setSaveError("Informe o nome do membro.");
@@ -132,7 +169,7 @@ export default function AdminMembersSection() {
       role: form.role.trim() || null,
       bio: form.bio.trim() || null,
       order_index: Number.parseInt(form.order_index.trim() || "0", 10),
-      photo_url: form.photo_url.trim() || null,
+      photo_path: form.photo_path ?? null,
     };
 
     setSaving(true);
@@ -168,7 +205,7 @@ export default function AdminMembersSection() {
     }
   };
 
-  const photoPreview = form.photo_url.trim();
+  const photoPreview = form.photo_url ?? "";
 
   return (
     <div className="admin-members">
@@ -320,36 +357,48 @@ export default function AdminMembersSection() {
           />
         </label>
 
-        <label className="members-photo-url">
-          URL da foto
-          <div className="members-photo-field">
-            <input
-              type="url"
-              placeholder="https://exemplo.com/foto.jpg"
-              value={form.photo_url}
-              onChange={(event) =>
-                setForm((prev) => ({ ...prev, photo_url: event.target.value }))
-              }
-            />
-            <span className="members-photo-example">
-              <Link2 size={14} /> Informe um endereço público da imagem.
-            </span>
+        <div className="members-photo-field">
+          <div className="members-photo-preview">
+            {photoPreview ? (
+              <img src={photoPreview} alt="Pré-visualização do membro" />
+            ) : (
+              <div className="members-photo-placeholder">
+                <UserCircle2 size={48} />
+                <span>Sem imagem</span>
+              </div>
+            )}
           </div>
-        </label>
-
-        <div className="members-photo-preview">
-          {photoPreview ? (
-            <img src={photoPreview} alt="Pré-visualização do membro" />
-          ) : (
-            <div className="members-photo-placeholder">
-              <UserCircle2 size={48} />
-              <span>Sem imagem</span>
-            </div>
-          )}
+          <div className="members-photo-actions">
+            <label className="admin-btn admin-btn-secondary">
+              {uploadingPhoto ? <Loader2 size={16} className="spin" /> : <ImagePlus size={16} />}
+              <span>{uploadingPhoto ? "Enviando..." : "Selecionar foto"}</span>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handlePhotoSelect}
+                hidden
+                disabled={uploadingPhoto || saving}
+              />
+            </label>
+            {form.photo_path ? (
+              <button
+                type="button"
+                className="admin-btn danger"
+                onClick={handleRemovePhoto}
+                disabled={uploadingPhoto || saving}
+              >
+                <ImageOff size={16} />
+                Remover
+              </button>
+            ) : null}
+            <p className="members-photo-example">
+              Arquivos até 512 KB. Formatos: JPG, PNG ou WEBP.
+            </p>
+          </div>
         </div>
 
         <footer className="members-form-actions">
-          <button type="submit" className="admin-btn" disabled={saving}>
+          <button type="submit" className="admin-btn" disabled={saving || uploadingPhoto}>
             {saving ? <Loader2 size={18} className="spin" /> : null}
             {form.id ? "Salvar alterações" : "Cadastrar membro"}
           </button>

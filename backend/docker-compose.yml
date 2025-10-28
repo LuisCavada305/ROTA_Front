@@ -77,6 +77,8 @@ services:
       UVICORN_KEEP_ALIVE: 5
     ports:
       - "8000:8000"
+    volumes:
+      - ../uploads:/opt/app/app/static/uploads
     restart: unless-stopped
     networks:
       - backend

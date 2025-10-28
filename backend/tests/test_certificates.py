@@ -76,7 +76,7 @@ def test_certificate_endpoint_commits_generated_certificate(client, db_session):
         row.code: row.id for row in db_session.query(LkProgressStatus).all()
     }
 
-    trail = Trails(name="Trail", thumbnail_url="https://example.com/thumb.jpg")
+    trail = Trails(name="Trail", thumbnail_path=None)
     db_session.add(trail)
     db_session.flush()
 
@@ -138,4 +138,3 @@ def test_certificate_endpoint_commits_generated_certificate(client, db_session):
         .first()
     )
     assert cert is not None
-

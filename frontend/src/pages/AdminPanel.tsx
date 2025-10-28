@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { ArrowDown, ArrowUp, Loader2, Plus, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { ArrowDown, ArrowUp, ImageOff, ImagePlus, Loader2, Plus, Trash2 } from "lucide-react";
 import Layout from "../components/Layout";
 import AdminMembersSection from "../components/AdminMembersSection";
 import { useAuth } from "../hooks/useAuth";
@@ -47,7 +47,8 @@ type AdminTrailSummary = {
 type AdminTrailDetail = {
   id: number;
   name: string;
-  thumbnail_url: string;
+  thumbnail_path: string | null;
+  thumbnail_url: string | null;
   description: string;
   author: string;
   sections: Array<{
@@ -281,7 +282,9 @@ export default function AdminPanel() {
   const trailsRequestInFlight = useRef(false);
 
   const [name, setName] = useState("");
-  const [thumbnailUrl, setThumbnailUrl] = useState("");
+  const [thumbnailPath, setThumbnailPath] = useState<string | null>(null);
+  const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
+  const [uploadingThumbnail, setUploadingThumbnail] = useState(false);
   const [author, setAuthor] = useState("");
   const [description, setDescription] = useState("");
   const [sections, setSections] = useState<DraftSection[]>([createEmptySection()]);
@@ -400,7 +403,9 @@ export default function AdminPanel() {
 
   const resetBuilder = () => {
     setName("");
-    setThumbnailUrl("");
+    setThumbnailPath(null);
+    setThumbnailPreview(null);
+    setUploadingThumbnail(false);
     setAuthor("");
     setDescription("");
     setSections([createEmptySection()]);
@@ -410,7 +415,9 @@ export default function AdminPanel() {
 
   const applyTrailToBuilder = (trail: AdminTrailDetail) => {
     setName(trail.name ?? "");
-    setThumbnailUrl(trail.thumbnail_url ?? "");
+    setThumbnailPath(trail.thumbnail_path ?? null);
+    setThumbnailPreview(trail.thumbnail_url ?? null);
+    setUploadingThumbnail(false);
     setAuthor(trail.author ?? "");
     setDescription(trail.description ?? "");
     const mappedSections = trail.sections.length
@@ -489,11 +496,42 @@ export default function AdminPanel() {
     void loadTrailForEdit(trailId);
   };
 
-  const handleStartNewTrail = () => {
+const handleStartNewTrail = () => {
+  setSaveError(null);
+  setSaveSuccess(null);
+  setExistingTrailsError(null);
+  resetBuilder();
+};
+
+  const handleThumbnailSelect = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setUploadingThumbnail(true);
     setSaveError(null);
-    setSaveSuccess(null);
-    setExistingTrailsError(null);
-    resetBuilder();
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const { data } = await http.post<{ path: string; url: string }>(
+        "/admin/uploads/trails",
+        formData
+      );
+      setThumbnailPath(data.path ?? null);
+      setThumbnailPreview(data.url ?? null);
+    } catch (err: any) {
+      const detail =
+        err?.response?.data?.detail ??
+        err?.message ??
+        "Não foi possível enviar a capa da rota.";
+      setSaveError(detail);
+    } finally {
+      setUploadingThumbnail(false);
+      event.target.value = "";
+    }
+  };
+
+  const handleRemoveThumbnail = () => {
+    setThumbnailPath(null);
+    setThumbnailPreview(null);
   };
 
   const addSection = () => {
@@ -805,14 +843,13 @@ export default function AdminPanel() {
     setExistingTrailsError(null);
 
     const trimmedName = name.trim();
-    const trimmedThumbnail = thumbnailUrl.trim();
 
     if (!trimmedName) {
       setSaveError("Informe o nome da rota.");
       return;
     }
-    if (!trimmedThumbnail) {
-      setSaveError("Informe a URL da capa da rota.");
+    if (!thumbnailPath) {
+      setSaveError("Envie uma imagem de capa para a rota.");
       return;
     }
     if (!sections.length) {
@@ -904,7 +941,7 @@ export default function AdminPanel() {
 
     const payload = {
       name: trimmedName,
-      thumbnail_url: trimmedThumbnail,
+      thumbnail_path: thumbnailPath,
       author: author.trim() || null,
       description: description.trim() || null,
       sections: sections.map((section, sectionIndex) => ({
@@ -1248,15 +1285,48 @@ export default function AdminPanel() {
                     placeholder="Nome do autor"
                   />
                 </label>
-                <label className="full">
-                  <span>URL da imagem de capa *</span>
-                  <input
-                    type="url"
-                    value={thumbnailUrl}
-                    onChange={(event) => setThumbnailUrl(event.target.value)}
-                    placeholder="https://..."
-                  />
-                </label>
+                <div className="builder-thumbnail-field">
+                  <span>Imagem de capa *</span>
+                  <div className="builder-thumbnail-row">
+                    <div className="builder-thumbnail-preview">
+                      {thumbnailPreview ? (
+                        <img src={thumbnailPreview} alt="Pré-visualização da capa" />
+                      ) : (
+                        <div className="builder-thumbnail-placeholder">
+                          <ImagePlus size={28} />
+                          <span>Sem imagem</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="builder-thumbnail-actions">
+                      <label className="admin-btn admin-btn-secondary">
+                        {uploadingThumbnail ? <Loader2 size={16} className="spin" /> : <ImagePlus size={16} />}
+                        <span>{uploadingThumbnail ? "Enviando..." : "Selecionar imagem"}</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          hidden
+                          onChange={handleThumbnailSelect}
+                          disabled={uploadingThumbnail || saving}
+                        />
+                      </label>
+                      {thumbnailPath ? (
+                        <button
+                          type="button"
+                          className="admin-btn danger"
+                          onClick={handleRemoveThumbnail}
+                          disabled={uploadingThumbnail || saving}
+                        >
+                          <ImageOff size={16} />
+                          Remover
+                        </button>
+                      ) : null}
+                      <p className="builder-thumbnail-hint">
+                        Utilize imagens até 512&nbsp;KB (sugerido 800×450).
+                      </p>
+                    </div>
+                  </div>
+                </div>
                 <label className="full">
                   <span>Descrição</span>
                   <textarea
@@ -1680,11 +1750,15 @@ export default function AdminPanel() {
                 type="button"
                 className="admin-btn admin-btn-ghost"
                 onClick={handleStartNewTrail}
-                disabled={saving || loadingTrail}
+                disabled={saving || loadingTrail || uploadingThumbnail}
               >
                 Limpar
               </button>
-              <button type="submit" className="admin-btn admin-btn-primary" disabled={saving}>
+              <button
+                type="submit"
+                className="admin-btn admin-btn-primary"
+                disabled={saving || uploadingThumbnail}
+              >
                 {saving ? <Loader2 size={16} className="spin" /> : null}
                 {isEditing ? "Atualizar rota" : "Salvar rota"}
               </button>

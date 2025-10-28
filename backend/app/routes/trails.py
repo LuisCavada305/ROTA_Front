@@ -27,7 +27,7 @@ bp = Blueprint("trails", __name__, url_prefix="/trails")
 class TrailOut(BaseModel):
     id: int
     name: str
-    thumbnail_url: str
+    thumbnail_url: Optional[str] = None
     author: Optional[str] = None
     review: Optional[float] = None
     review_count: Optional[int] = None

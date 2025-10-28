@@ -230,7 +230,11 @@ export default function Home() {
                 return (
                 <article key={t.id} className={`track-card ${t.is_completed ? "is-completed" : ""}`}>
                   <div className="track-cover">
-                    <img src={t.thumbnail_url} alt={t.name} loading="lazy" />
+                    <img
+                      src={t.thumbnail_url ?? LogoRota}
+                      alt={t.name}
+                      loading="lazy"
+                    />
                   </div>
 
                   <div className="track-body">

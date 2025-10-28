@@ -10,6 +10,7 @@ from app.models.lk_progress_status import LkProgressStatus as LkProgressStatusOR
 from app.models.lk_enrollment_status import LkEnrollmentStatus as LkEnrollmentStatusORM
 from app.models.trails import Trails as TrailsORM
 
+from app.services.media import build_media_url
 from app.services.security import get_current_user_id
 from app.repositories.CertificatesRepository import CertificatesRepository
 
@@ -285,7 +286,7 @@ class UserTrailsRepository:
             self.db.query(
                 UserTrailsORM.trail_id,
                 TrailsORM.name,
-                TrailsORM.thumbnail_url,
+                TrailsORM.thumbnail_path,
                 TrailsORM.author,
                 LkEnrollmentStatusORM.code.label("status_code"),
             )
@@ -324,7 +325,9 @@ class UserTrailsRepository:
                 {
                     "trail_id": row.trail_id,
                     "name": row.name,
-                    "thumbnail_url": row.thumbnail_url,
+                    "thumbnail_url": build_media_url(
+                        getattr(row, "thumbnail_path", None), external=True
+                    ),
                     "author": row.author,
                     "status": progress.get("status") or row.status_code,
                     "progress": progress,

@@ -19,6 +19,8 @@ RUN python -m pip install --upgrade pip \
 
 COPY . ${APP_HOME}
 
+RUN mkdir -p ${APP_HOME}/app/static/uploads
+
 # Cria usuário não privilegiado para rodar a API
 RUN useradd --create-home --shell /bin/bash appuser \
     && chown -R appuser:appuser ${APP_HOME}

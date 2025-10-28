@@ -4,6 +4,7 @@ export type Member = {
   role: string | null;
   bio: string | null;
   order_index: number;
+  photo_path?: string | null;
   photo_url: string | null;
   created_at: string | null;
   updated_at: string | null;

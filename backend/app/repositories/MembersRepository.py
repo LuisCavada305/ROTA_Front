@@ -26,14 +26,14 @@ class MembersRepository:
         role: str | None,
         bio: str | None,
         order_index: int,
-        photo_url: str | None,
+        photo_path: str | None,
     ) -> Member:
         member = Member(
             full_name=full_name,
             role=role,
             bio=bio,
             order_index=order_index,
-            photo_url=photo_url,
+            photo_path=photo_path,
         )
         self.db.add(member)
         self.db.commit()
@@ -48,28 +48,34 @@ class MembersRepository:
         role: str | None,
         bio: str | None,
         order_index: int,
-        photo_url: str | None,
-    ) -> Member:
+        photo_path: str | None,
+    ) -> tuple[Member, str | None]:
         member = self.db.get(Member, member_id)
         if not member:
             raise LookupError("Member not found.")
 
+        previous_path = member.photo_path
         member.full_name = full_name
         member.role = role
         member.bio = bio
         member.order_index = order_index
-        member.photo_url = photo_url
+        member.photo_path = photo_path
 
         self.db.commit()
         self.db.refresh(member)
-        return member
+        removed_path = (
+            previous_path if previous_path and previous_path != member.photo_path else None
+        )
+        return member, removed_path
 
-    def delete_member(self, member_id: int) -> None:
+    def delete_member(self, member_id: int) -> str | None:
         member = self.db.get(Member, member_id)
         if not member:
             raise LookupError("Member not found.")
+        photo_path = member.photo_path
         self.db.delete(member)
         self.db.commit()
+        return photo_path
 
     def count(self) -> int:
         return self.db.query(Member).count()

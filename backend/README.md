@@ -20,6 +20,24 @@ parâmetros seguros configuráveis por variáveis de ambiente.
 
 > O `make` já lê as variáveis do arquivo `.env`; se ele não existir, copie o `.env.example`.
 
+### Uploads locais
+
+As imagens de membros e capas de trilhas são gravadas na pasta `uploads/` (bind mount no
+`docker-compose.yml`). Antes de subir os containers, garanta que o diretório exista:
+
+```bash
+mkdir -p uploads/members uploads/trails
+```
+
+Em ambientes de produção (ex.: `/opt/rota`), aponte o volume para um caminho persistente
+e ajuste as permissões para o usuário que executa a API:
+
+```bash
+sudo mkdir -p /opt/rota/uploads/{members,trails}
+sudo chown -R www-data:www-data /opt/rota/uploads
+sudo chmod 750 /opt/rota/uploads
+```
+
 ## Variáveis de ambiente principais
 
 | Variável | Obrigatória | Descrição |

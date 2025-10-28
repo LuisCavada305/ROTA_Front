@@ -6,6 +6,7 @@ import { http } from "../lib/http";
 import { useAuth } from "../hooks/useAuth";
 import "../styles/UserPanel.css";
 import { BookOpen, Layers, Trophy } from "lucide-react";
+import LogoRota from "../images/RotaLogoRedondo.png";
 
 type CertificateSummary = {
   hash: string;
@@ -27,7 +28,7 @@ type TrailProgress = {
 type TrailOverview = {
   trail_id: number;
   name: string;
-  thumbnail_url: string;
+  thumbnail_url?: string | null;
   author?: string | null;
   status?: string | null;
   progress: TrailProgress;
@@ -226,7 +227,7 @@ export default function UserPanel() {
                   return (
                     <article key={trail.trail_id} className="user-panel__course-card">
                       <img
-                        src={trail.thumbnail_url}
+                        src={trail.thumbnail_url ?? LogoRota}
                         alt={trail.name}
                         className="user-panel__course-thumb"
                         loading="lazy"
@@ -274,7 +275,7 @@ export default function UserPanel() {
                   return (
                     <article key={trail.trail_id} className="user-panel__course-card">
                       <img
-                        src={trail.thumbnail_url}
+                        src={trail.thumbnail_url ?? LogoRota}
                         alt={trail.name}
                         className="user-panel__course-thumb"
                         loading="lazy"

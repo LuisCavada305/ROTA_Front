@@ -51,7 +51,7 @@ class SectionProgressOut(BaseModel):
 class TrailOverviewOut(BaseModel):
     trail_id: int
     name: str
-    thumbnail_url: str
+    thumbnail_url: Optional[str] = None
     author: Optional[str] = None
     status: Optional[str] = None
     progress: ProgressOut

@@ -4,6 +4,7 @@ import { http } from "../lib/http";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { normalizePaginatedPayload, type PaginatedPayload } from "../types/Pagination";
+import LogoRota from "../images/RotaLogoRedondo.png";
 
 type SectionItem = {
   id: number;
@@ -23,7 +24,7 @@ type SectionSummary = Omit<Section, "items">;
 type TrailCore = {
   id: number;
   name: string;                // no back está "name"; no front eu exponho como "title"
-  thumbnail_url: string;
+  thumbnail_url?: string | null;
   description?: string | null;
   author?: string | null;
   category?: string | null;
@@ -92,7 +93,7 @@ export default function TrailDetails() {
     id: number;
     title: string;
     category: string;
-    thumbnail_url: string;
+    thumbnail_url: string | null;
     description: string;
     learn: string[];         // você pode usar para “O que você aprenderá?” ou esconder se vier vazio
     sections: Section[];
@@ -677,7 +678,10 @@ export default function TrailDetails() {
           <div className="trail-grid">
             <main className="trail-main">
               <div className="trail-cover">
-                <img src={vm.thumbnail_url} alt={vm.title} />
+                <img
+                  src={vm.thumbnail_url ?? LogoRota}
+                  alt={vm.title}
+                />
               </div>
 
               {vm.description && (

@@ -169,7 +169,7 @@ CREATE TABLE public.members (
     full_name       VARCHAR(160) NOT NULL,
     role            VARCHAR(160),
     bio             TEXT,
-    photo_url       VARCHAR(512),
+    photo_path      VARCHAR(512),
     order_index     INT NOT NULL DEFAULT 0,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -179,7 +179,7 @@ CREATE INDEX idx_members_order ON public.members (order_index, full_name);
 -- DROP TABLE public.trails;
 CREATE TABLE public.trails (
     id              BIGSERIAL PRIMARY KEY,
-    thumbnail_url   TEXT NOT NULL,
+    thumbnail_path  TEXT,
     "name"          TEXT NOT NULL,
     review          NUMERIC,
     review_count    INT,

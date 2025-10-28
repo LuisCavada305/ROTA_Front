@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import '../styles/Home.css';
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import "../styles/Home.css";
 import type { Trilha } from "../types/Trilha";
 import { http } from "../lib/http";
-import Layout from '../components/Layout';
+import Layout from "../components/Layout";
 import type { PaginationMeta } from "../types/Pagination";
+import LogoRota from "../images/RotaLogoRedondo.png";
 
 function formatTrailStatus(status?: string | null, isCompleted?: boolean | null) {
   if (isCompleted) return "Concluída";
@@ -149,7 +150,11 @@ export default function Trails() {
               <article key={t.id} className={`track-card ${t.is_completed ? "is-completed" : ""}`}>
               <div className="track-cover">
                 <a href={`/trail-details/${t.id}`}>
-                  <img src={t.thumbnail_url} alt={t.name} loading="lazy" />
+                  <img
+                    src={t.thumbnail_url ?? LogoRota}
+                    alt={t.name}
+                    loading="lazy"
+                  />
                 </a>
               </div>
                 <div className="track-body">

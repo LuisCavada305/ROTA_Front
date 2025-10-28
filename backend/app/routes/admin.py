@@ -14,6 +14,7 @@ from app.models.trail_certificates import TrailCertificates as TrailCertificates
 from app.models.user_trails import UserTrails as UserTrailsORM
 from app.models.lk_enrollment_status import LkEnrollmentStatus as LkEnrollmentStatusORM
 from app.repositories.TrailsRepository import TrailsRepository
+from app.services.media import delete_media
 from app.services.security import enforce_csrf, require_roles
 from app.routes import format_validation_error
 
@@ -148,12 +149,12 @@ class AdminTrailSectionIn(BaseModel):
 
 class AdminTrailCreateIn(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
-    thumbnail_url: str = Field(..., min_length=1)
+    thumbnail_path: str = Field(..., min_length=1, max_length=512)
     description: str | None = None
     author: str | None = None
     sections: List[AdminTrailSectionIn] = Field(default_factory=list)
 
-    @field_validator("name", "thumbnail_url")
+    @field_validator("name", "thumbnail_path")
     @classmethod
     def strip_required(cls, value: str) -> str:
         cleaned = value.strip()
@@ -423,7 +424,7 @@ def create_trail():
     try:
         trail = repo.create_trail(
             name=payload.name,
-            thumbnail_url=payload.thumbnail_url,
+            thumbnail_path=payload.thumbnail_path,
             description=payload.description,
             author=payload.author,
             created_by=getattr(admin, "user_id", None),
@@ -466,10 +467,10 @@ def update_trail(trail_id: int):
     ]
 
     try:
-        trail = repo.update_trail(
+        trail, removed_thumbnail = repo.update_trail(
             trail_id=trail_id,
             name=payload.name,
-            thumbnail_url=payload.thumbnail_url,
+            thumbnail_path=payload.thumbnail_path,
             description=payload.description,
             author=payload.author,
             sections=sections_payload,
@@ -483,5 +484,7 @@ def update_trail(trail_id: int):
     except Exception:
         db.rollback()
         raise
+
+    delete_media(removed_thumbnail)
 
     return jsonify({"trail": {"id": trail.id, "name": trail.name}})

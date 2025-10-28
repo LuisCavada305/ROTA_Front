@@ -18,6 +18,7 @@ from app.models.form_question_options import (
 )
 from app.models.lk_item_type import LkItemType as LkItemTypeORM
 from app.models.lk_question_type import LkQuestionType as LkQuestionTypeORM
+from app.services.media import build_media_url
 
 
 class TrailsRepository:
@@ -242,7 +243,7 @@ class TrailsRepository:
         self,
         *,
         name: str,
-        thumbnail_url: str,
+        thumbnail_path: str | None,
         description: str | None,
         author: str | None,
         created_by: int | None,
@@ -250,7 +251,7 @@ class TrailsRepository:
     ) -> TrailsORM:
         trail = TrailsORM(
             name=name,
-            thumbnail_url=thumbnail_url,
+            thumbnail_path=thumbnail_path,
             description=description,
             author=author,
             created_by=created_by,
@@ -276,11 +277,11 @@ class TrailsRepository:
         trail_id: int,
         *,
         name: str,
-        thumbnail_url: str,
+        thumbnail_path: str | None,
         description: str | None,
         author: str | None,
         sections: list[dict],
-    ) -> TrailsORM:
+    ) -> tuple[TrailsORM, str | None]:
         trail = (
             self.db.query(TrailsORM)
             .options(selectinload(TrailsORM.sections))
@@ -290,8 +291,9 @@ class TrailsRepository:
         if not trail:
             raise LookupError("Trail not found")
 
+        previous_path = trail.thumbnail_path
         trail.name = name
-        trail.thumbnail_url = thumbnail_url
+        trail.thumbnail_path = thumbnail_path
         trail.description = description
         trail.author = author
 
@@ -309,7 +311,10 @@ class TrailsRepository:
 
         self.db.commit()
         self.db.refresh(trail)
-        return trail
+        removed_path = (
+            previous_path if previous_path and previous_path != trail.thumbnail_path else None
+        )
+        return trail, removed_path
 
     def list_admin_trails(self) -> List[TrailsORM]:
         return self.db.query(TrailsORM).order_by(TrailsORM.name).all()
@@ -419,7 +424,8 @@ class TrailsRepository:
         return {
             "id": trail.id,
             "name": trail.name,
-            "thumbnail_url": trail.thumbnail_url,
+            "thumbnail_path": trail.thumbnail_path,
+            "thumbnail_url": build_media_url(trail.thumbnail_path, external=True),
             "description": trail.description or "",
             "author": trail.author or "",
             "sections": sections_payload,

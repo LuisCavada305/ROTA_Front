@@ -5,7 +5,7 @@ import Register from "./pages/Register";
 import AuthGate from "./components/AuthGate";
 import Trails from "./pages/Trails";
 import CourseDetails from "./pages/TrailDetails";
-// import Members from "./pages/Members";
+import Members from "./pages/Members";
 import Forum from "./pages/Forum";
 import Trail from "./pages/Trail";
 import Certificate from "./pages/Certificate";
@@ -37,7 +37,7 @@ export default function App() {
         <Route path="/painel" element={<UserPanel />} />
         <Route path="/perfil" element={<Profile />} />
         <Route path="/admin" element={<AdminPanel />} />
-        {/* <Route path="/membros" element={<Members />} /> */}
+        <Route path="/membros" element={<Members />} />
       </Routes>
     </>
   );

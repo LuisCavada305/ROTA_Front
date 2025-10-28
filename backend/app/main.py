@@ -11,6 +11,7 @@ from app.routes.certificates import bp as certificates_bp
 from app.routes.user_trails import bp as user_trails_bp
 from app.routes.forums import bp as forums_bp
 from app.routes.admin import bp as admin_bp
+from app.routes.members import members_bp, admin_members_bp
 from app.services.forum_bootstrap import ensure_forum_tables
 
 
@@ -65,6 +66,8 @@ def create_app() -> Flask:
     app.register_blueprint(certificates_bp)
     app.register_blueprint(forums_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(members_bp)
+    app.register_blueprint(admin_members_bp)
 
     app.teardown_appcontext(close_db)
 

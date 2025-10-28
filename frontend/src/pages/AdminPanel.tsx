@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { ArrowDown, ArrowUp, Loader2, Plus, Trash2 } from "lucide-react";
 import Layout from "../components/Layout";
+import AdminMembersSection from "../components/AdminMembersSection";
 import { useAuth } from "../hooks/useAuth";
 import { http } from "../lib/http";
 import "../styles/AdminPanel.css";
@@ -260,7 +261,7 @@ function toDraftQuestionType(value: string): DraftQuestionType {
 
 export default function AdminPanel() {
   const { user, loading: authLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<"dashboard" | "builder">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "builder" | "members">("dashboard");
 
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [dashboardLoading, setDashboardLoading] = useState(false);
@@ -1016,6 +1017,13 @@ export default function AdminPanel() {
           >
             Criar rota
           </button>
+          <button
+            type="button"
+            className={`admin-tab ${activeTab === "members" ? "is-active" : ""}`}
+            onClick={() => setActiveTab("members")}
+          >
+            Membros
+          </button>
         </div>
 
         {activeTab === "dashboard" ? (
@@ -1161,7 +1169,7 @@ export default function AdminPanel() {
               </section>
             </div>
           </div>
-        ) : (
+        ) : activeTab === "builder" ? (
           <form className="admin-builder" onSubmit={handleSubmit}>
             <div className="admin-builder-toolbar">
               <div className="admin-builder-toolbar-group">
@@ -1682,6 +1690,8 @@ export default function AdminPanel() {
               </button>
             </div>
           </form>
+        ) : (
+          <AdminMembersSection />
         )}
       </section>
     </Layout>

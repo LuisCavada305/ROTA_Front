@@ -228,42 +228,14 @@ select.form-control option[disabled] {
 }
 
 .login-error {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  z-index: 1000;
-
-  background-color: #f44336; /* vermelho erro */
-  color: #fff;
-  padding: 12px 20px;
-  border-radius: 8px;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-
+  margin: 12px 0 0;
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
   font-size: 14px;
-  font-weight: 500;
-  max-width: 300px;
-  line-height: 1.4;
-
-  opacity: 0;
-  transform: translateY(-20px);
-
-  /* animações em sequência: entrar, esperar, sair */
-  animation: slideDownFade 0.3s ease-out forwards,
-             fadeOut 0.5s ease-in forwards 4s; /* começa a sumir após 4s */
-}
-
-@keyframes slideDownFade {
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes fadeOut {
-  to {
-    opacity: 0;
-    transform: translateY(-20px);
-  }
+  line-height: 1.45;
 }
 
 .login-success {
@@ -279,9 +251,7 @@ select.form-control option[disabled] {
 
 @media (max-width: 640px) {
   .login-error {
-    left: 16px;
-    right: 16px;
-    top: 16px;
-    max-width: none;
+    margin-top: 16px;
+    text-align: left;
   }
 }

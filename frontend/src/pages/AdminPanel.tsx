@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
-import { ArrowDown, ArrowUp, ImageOff, ImagePlus, Loader2, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, FileUp, ImageOff, ImagePlus, Loader2, Plus, Trash2 } from "lucide-react";
 import Layout from "../components/Layout";
 import AdminMembersSection from "../components/AdminMembersSection";
 import { useAuth } from "../hooks/useAuth";
@@ -60,6 +60,7 @@ type AdminTrailDetail = {
       title: string;
       type: string;
       url: string;
+      resource_url?: string | null;
       duration_seconds: number | null;
       requires_completion: boolean;
       order_index: number;
@@ -123,6 +124,10 @@ type DraftItem = {
   content: string;
   duration: string;
   requiresCompletion: boolean;
+  documentName: string | null;
+  documentUrl: string | null;
+  documentUploading: boolean;
+  documentError: string | null;
   form?: DraftForm;
 };
 
@@ -143,6 +148,9 @@ const DEFAULT_QUESTION_TYPES: ItemTypeOption[] = [
   { code: "TRUE_OR_FALSE", label: "Verdadeiro ou falso" },
   { code: "SINGLE_CHOICE", label: "Múltipla escolha" },
 ];
+
+const DOCUMENT_ACCEPT =
+  ".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.odt,.ods,.txt";
 
 function randomId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -166,6 +174,21 @@ function normalizeError(err: unknown): string {
     if (message) return message;
   }
   return "Não foi possível completar a operação.";
+}
+
+function extractDocumentName(value: string): string {
+  if (!value) return "";
+  try {
+    const parsed = new URL(value);
+    const segments = parsed.pathname.split("/").filter(Boolean);
+    if (segments.length) {
+      return decodeURIComponent(segments[segments.length - 1]);
+    }
+  } catch {
+    // não é uma URL absoluta, segue o fluxo para caminhos relativos
+  }
+  const parts = value.split(/[/\\]/).filter(Boolean);
+  return parts.length ? parts[parts.length - 1] : value;
 }
 
 function createEmptySection(): DraftSection {
@@ -425,13 +448,26 @@ export default function AdminPanel() {
           id: randomId(),
           title: section.title ?? "",
           items: section.items.map((item) => {
+            const normalizedType = (item.type || "VIDEO").toUpperCase();
+            const rawContent = item.url ?? "";
+            const resolvedDocumentUrl =
+              item.resource_url ??
+              (rawContent.startsWith("http://") || rawContent.startsWith("https://")
+                ? rawContent
+                : null);
+            const documentName =
+              normalizedType === "DOC" ? extractDocumentName(rawContent) : null;
             const baseItem: DraftItem = {
               id: randomId(),
               title: item.title ?? "",
-              type: (item.type || "VIDEO").toUpperCase(),
-              content: item.url ?? "",
+              type: normalizedType,
+              content: rawContent,
               duration: item.duration_seconds != null ? String(item.duration_seconds) : "",
               requiresCompletion: Boolean(item.requires_completion),
+              documentName,
+              documentUrl: normalizedType === "DOC" ? resolvedDocumentUrl : null,
+              documentUploading: false,
+              documentError: null,
               form: undefined,
             };
             if (baseItem.type === "FORM" && item.form) {
@@ -579,6 +615,10 @@ const handleStartNewTrail = () => {
                   content: "",
                   duration: "",
                   requiresCompletion: false,
+                  documentName: null,
+                  documentUrl: null,
+                  documentUploading: false,
+                  documentError: null,
                   form: defaultType === "FORM" ? createDefaultForm() : undefined,
                 },
               ],
@@ -634,6 +674,34 @@ const handleStartNewTrail = () => {
             ...patch,
             form: ensureForm,
           };
+          if ("content" in patch) {
+            const nextContent = patch.content ?? "";
+            merged.content = nextContent;
+            merged.documentError = null;
+            if (!("documentName" in patch)) {
+              merged.documentName = nextContent ? extractDocumentName(nextContent) : null;
+            }
+            if (!("documentUrl" in patch)) {
+              merged.documentUrl =
+                nextContent && (nextContent.startsWith("http://") || nextContent.startsWith("https://"))
+                  ? nextContent
+                  : null;
+            }
+          }
+          if ("type" in patch && patch.type !== "DOC" && item.type === "DOC") {
+            merged.documentName = null;
+            merged.documentUrl = null;
+            merged.documentError = null;
+            merged.documentUploading = false;
+          }
+          if (merged.type !== "DOC") {
+            merged.documentName = null;
+            merged.documentUrl = null;
+            merged.documentError = null;
+            merged.documentUploading = false;
+          } else if (merged.documentUploading === undefined || merged.documentUploading === null) {
+            merged.documentUploading = false;
+          }
           if (merged.form && merged.type === "FORM") {
             merged.form = {
               ...merged.form,
@@ -651,6 +719,52 @@ const handleStartNewTrail = () => {
         return { ...section, items: nextItems };
       })
     );
+  };
+
+  const handleDocumentSelect = async (
+    sectionId: string,
+    itemId: string,
+    event: ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    updateItem(sectionId, itemId, {
+      documentUploading: true,
+      documentError: null,
+    });
+    setSaveError(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const { data } = await http.post<{ path: string; url: string }>(
+        "/admin/uploads/documents",
+        formData
+      );
+      updateItem(sectionId, itemId, {
+        content: data.path ?? "",
+        documentName: file.name,
+        documentUrl: data.url ?? null,
+        documentUploading: false,
+        documentError: null,
+      });
+    } catch (err) {
+      updateItem(sectionId, itemId, {
+        documentUploading: false,
+        documentError: normalizeError(err),
+      });
+    } finally {
+      event.target.value = "";
+    }
+  };
+
+  const handleClearDocument = (sectionId: string, itemId: string) => {
+    updateItem(sectionId, itemId, {
+      content: "",
+      documentName: null,
+      documentUrl: null,
+      documentError: null,
+      documentUploading: false,
+    });
   };
 
   const setFormState = (
@@ -1449,6 +1563,58 @@ const handleStartNewTrail = () => {
                                 placeholder="Link ou identificador do conteúdo"
                               />
                             </label>
+                            {item.type === "DOC" ? (
+                              <div className="builder-doc-upload">
+                                <label className="admin-btn admin-btn-ghost">
+                                  {item.documentUploading ? (
+                                    <Loader2 size={16} className="spin" />
+                                  ) : (
+                                    <FileUp size={16} />
+                                  )}
+                                  <span>{item.documentUploading ? "Enviando..." : "Enviar arquivo"}</span>
+                                  <input
+                                    type="file"
+                                    accept={DOCUMENT_ACCEPT}
+                                    hidden
+                                    onChange={(event) => {
+                                      void handleDocumentSelect(section.id, item.id, event);
+                                    }}
+                                    disabled={item.documentUploading || saving}
+                                  />
+                                </label>
+                                <p className="admin-hint">
+                                  {item.documentName ? (
+                                    <>
+                                      Documento atual:&nbsp;
+                                      {item.documentUrl ? (
+                                        <a href={item.documentUrl} target="_blank" rel="noopener noreferrer">
+                                          {item.documentName}
+                                        </a>
+                                      ) : (
+                                        item.documentName
+                                      )}
+                                    </>
+                                  ) : (
+                                    "Você pode colar um link externo ou enviar um arquivo (até 20 MB)."
+                                  )}
+                                </p>
+                                {item.content ? (
+                                  <div className="builder-doc-upload-actions">
+                                    <button
+                                      type="button"
+                                      className="admin-btn admin-btn-ghost"
+                                      onClick={() => handleClearDocument(section.id, item.id)}
+                                      disabled={item.documentUploading || saving}
+                                    >
+                                      Remover arquivo
+                                    </button>
+                                  </div>
+                                ) : null}
+                                {item.documentError ? (
+                                  <p className="admin-field-error">{item.documentError}</p>
+                                ) : null}
+                              </div>
+                            ) : null}
 
                             <label className="checkbox">
                               <input

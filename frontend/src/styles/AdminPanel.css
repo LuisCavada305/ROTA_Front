@@ -525,6 +525,31 @@
   color: #475569;
 }
 
+.builder-doc-upload {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.builder-doc-upload .admin-hint {
+  margin: 0;
+}
+
+.builder-doc-upload-actions {
+  display: inline-flex;
+}
+
+.builder-doc-upload-actions .admin-btn {
+  padding: 8px 14px;
+}
+
+.admin-field-error {
+  font-size: 13px;
+  color: #b91c1c;
+  margin: 0;
+}
+
 .admin-item-grid label.full {
   grid-column: 1 / -1;
 }

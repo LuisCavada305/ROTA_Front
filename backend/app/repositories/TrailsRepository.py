@@ -18,7 +18,7 @@ from app.models.form_question_options import (
 )
 from app.models.lk_item_type import LkItemType as LkItemTypeORM
 from app.models.lk_question_type import LkQuestionType as LkQuestionTypeORM
-from app.services.media import build_media_url
+from app.services.media import build_media_url, cache_document
 
 
 class TrailsRepository:
@@ -60,11 +60,26 @@ class TrailsRepository:
                 if isinstance(duration_value, str):
                     duration_value = duration_value.strip()
                     duration_value = int(duration_value) if duration_value else None
+                url_value = (item_payload.get("url") or "").strip()
+                if type_code == "DOC":
+                    if not url_value:
+                        raise ValueError("Itens do tipo Documento precisam de um conteúdo/URL.")
+                    try:
+                        cache_document(
+                            url_value,
+                            subdir=f"documents/trail_{trail_id}",
+                            filename_hint=f"section_{index + 1}_item_{item_index + 1}",
+                        )
+                    except ValueError as exc:
+                        title_hint = (item_payload.get("title") or "").strip() or f"Item {item_index + 1}"
+                        raise ValueError(
+                            f"Não foi possível salvar o documento do item '{title_hint}': {exc}"
+                        ) from exc
                 item = TrailItemsORM(
                     trail_id=trail_id,
                     section_id=section.id,
                     title=item_payload.get("title"),
-                    url=item_payload.get("url"),
+                    url=url_value,
                     duration_seconds=duration_value,
                     order_index=item_order if item_order is not None else item_index,
                     item_type_id=item_type_map[type_code],
@@ -353,11 +368,16 @@ class TrailsRepository:
                 section.items, key=lambda i: (i.order_index or 0, i.id)
             )
             for item in sorted_items:
+                item_type_code = (item.legacy_type or "").upper()
+                resource_url = None
+                if item_type_code == "DOC":
+                    resource_url = build_media_url(item.url, external=True)
                 item_payload: dict = {
                     "id": item.id,
                     "title": item.title or "",
-                    "type": (item.legacy_type or "").upper(),
+                    "type": item_type_code,
                     "url": item.url or "",
+                    "resource_url": resource_url,
                     "duration_seconds": item.duration_seconds,
                     "requires_completion": item.completion_required(),
                     "order_index": item.order_index or 0,

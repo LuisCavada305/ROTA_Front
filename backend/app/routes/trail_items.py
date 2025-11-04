@@ -3,9 +3,9 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from decimal import Decimal
+from pathlib import Path
 from typing import Dict, Literal, Optional, Tuple
 from urllib.parse import urlparse
-import os
 
 from flask import Blueprint, abort, jsonify, request
 from pydantic import BaseModel, ValidationError, field_validator
@@ -22,6 +22,7 @@ from app.models.forms import Form as FormORM
 from app.models.trail_items import TrailItems as TrailItemsORM
 from app.repositories.UserTrailsRepository import UserTrailsRepository
 from app.repositories.UserProgressRepository import UserProgressRepository
+from app.services.media import build_media_url, cache_document
 from app.services.security import enforce_csrf, get_current_user
 from app.routes import format_validation_error
 
@@ -31,6 +32,7 @@ bp = Blueprint("trail_items", __name__, url_prefix="/trails")
 
 QuestionKind = Literal["ESSAY", "TRUE_OR_FALSE", "SINGLE_CHOICE", "UNKNOWN"]
 ResourceKind = Literal["PDF", "IMAGE", "OTHER"]
+IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".svg"}
 
 
 class FormOptionOut(BaseModel):
@@ -136,20 +138,61 @@ def _option_is_correct(option: FormQuestionOptionORM) -> Optional[bool]:
     return None
 
 
+def _resource_kind_from_extension(ext: str) -> Optional[ResourceKind]:
+    if not ext:
+        return None
+    if ext == ".pdf":
+        return "PDF"
+    if ext in IMAGE_EXTENSIONS:
+        return "IMAGE"
+    return "OTHER"
+
+
+def _normalize_local_resource(url: str) -> Optional[str]:
+    cleaned = (url or "").strip().lstrip("/")
+    if not cleaned:
+        return None
+    if cleaned.startswith("static/"):
+        cleaned = cleaned[len("static/") :]
+    return cleaned or None
+
+
 def _classify_resource(url: str) -> Tuple[Optional[str], Optional[ResourceKind]]:
     cleaned = (url or "").strip()
     if not cleaned:
         return None, None
 
-    parsed = urlparse(cleaned)
-    path = parsed.path or ""
-    _, ext = os.path.splitext(path.lower())
+    if cleaned.startswith(("http://", "https://")):
+        parsed = urlparse(cleaned)
+        ext = Path(parsed.path or "").suffix.lower()
+        return cleaned, _resource_kind_from_extension(ext)
 
-    if ext == ".pdf":
-        return cleaned, "PDF"
-    if ext in {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".svg"}:
-        return cleaned, "IMAGE"
-    return cleaned, "OTHER"
+    relative = _normalize_local_resource(cleaned)
+    if relative:
+        ext = Path(relative).suffix.lower()
+        url_out = build_media_url(relative, external=True)
+        return url_out, _resource_kind_from_extension(ext)
+
+    ext = Path(cleaned).suffix.lower()
+    url_out = build_media_url(cleaned, external=True)
+    return url_out, _resource_kind_from_extension(ext)
+
+
+def _resolve_document_resource(item: TrailItemsORM) -> Tuple[Optional[str], Optional[ResourceKind]]:
+    raw_url = (item.url or "").strip()
+    if not raw_url:
+        return None, None
+
+    try:
+        cached_path = cache_document(
+            raw_url,
+            subdir=f"documents/trail_{item.trail_id}",
+            filename_hint=f"item_{item.id}",
+        )
+    except ValueError:
+        return _classify_resource(raw_url)
+
+    return _classify_resource(cached_path)
 
 
 def _question_is_required(question: FormQuestionORM) -> bool:
@@ -331,7 +374,7 @@ def get_item_detail(trail_id: int, item_id: int):
         )
         description_html = form.description or ""
     elif item_type == "DOC":
-        resource_url, resource_kind = _classify_resource(item.url or "")
+        resource_url, resource_kind = _resolve_document_resource(item)
 
     data = TrailItemDetailOut(
         id=item.id,
